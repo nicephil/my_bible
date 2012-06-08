@@ -1,0 +1,28 @@
+<title>编译和链接</title>
+<para>
+    对于一个程序员来说，有必要深入了解下，编译器和链接器隐藏的东西。我试图去理解它。
+</para>
+<sect1>
+    <title>GCC编译和链接</title>
+    <screen>
+1. 预处理(Prepressing): 
+gcc -E hello.c -o hello.i或cpp hello.c > hello.i
+展开#define宏定义
+处理条件预编译#ifdef
+处理#include预编译指令，并将被包含文件插入到该预编译指令位置,递归进行。
+删除注释
+添加行号和文件名标识
+保留所有#pragma编译器指令
+2. 编译(Compilation):
+gcc -S hello.i -o hello.s 或
+预处理和编译合并一个步骤gcc -S hello.c -o hello.s
+对于C来说是/usr/lib/gcc/i686-linux-gnu/4.1/cc1 hello.c或对于C++来说是cc1plus
+把预处理完的文件进行一系列词法分析，语法分析，语义分析以及优化后生成相应的汇编代码文件。
+3. 汇编(Assembly):
+as hello.s -o hello.o或gcc -c hello.s -o hello.o
+gcc -c hello.c -o hello.o
+将汇编代码转变成机器指令
+4. 链接(Linking):
+ld -static /usr/lib/crt1.o /usr/lib/crti.o /usr/lib/gcc/i686-linux-gnu/4.1.3/crtbeginT.o -L/usr/lib/gcc/i686-linux-gnu/4.1.3 -L/usr/lib -L/lib hello.o --start-group -lgcc -lgcc_eh -lc --end-group /usr/lib/gcc/i686-linux-gnu/4.1.3/crtend.o /usr/lib/crtn.o
+    </screen>
+</sect1>

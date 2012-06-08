@@ -1,0 +1,179 @@
+<title>SWF文件格式概述</title>
+<sect1>
+    <title>概述</title>
+    <screen>
+字段         类型        备注    
+标识         8位         标识字节: F代表未压缩 C代表已压缩(SWF6以后的版本特有)
+标识字节     8位         代表W
+标识字节     8位         代表S
+版本号       8位         代表SWF文件的版本，比如0x06代表SWF6
+文件长度     32位        整个文件的所占的字节数
+帧大小      RECT结构体   SWF场景的大小，单位为1twip（1/20像素）
+帧速度       16位
+帧数         16位        影片总的帧数目
+
+The header begins with a three-byte Signature of either 0x46, 0x57, 0x53 (“FWS”) or 0x46, 
+0x57, 0x43 (“CWS”). An FWS signature indicates an uncompressed SWF file; CWS indicates 
+that the entire file after the first 8 bytes (that is, after the FileLength field) has been compressed using the open standard ZLIB. The data format used by the ZLIB library is described by Request　for Comments (RFCs) documents 1950 to 1952. CWS file compression is only permitted in SWF version 6 or later. 
+文件头以三个标识符开始，他们不是0x46, 0x57, 0x53 (“FWS”)就是0x46,0x57, 0x43 (“CWS”)．一个FWS标识表示该文件是未压缩文件．CWS标识表示整个文件，在前八个字节，也就是文件长度字段之后所有的内容，都是开放标准ZLIB压缩过的．用ZLIB库的数据格式，在1950 到1952年的Request for Comments (RFCs)文档中有所描述．CWS仅在SWF6以后才允许使用．
+
+A one-byte Version number follows the signature. The version number is not an ASCII character,but an 8-bit number. For example, for SWF 4 the version byte is 0x04, not the ASCII character‘4’ (0x35). 
+在标识符之后的一个字节是版本号．这个版本号不是一个ASCII字符，而是一个8位的数字．例如，SWF4文件的版本号是0x04，不是ASCII字符”4”(0x35)． 
+
+The FileLength field is the total length of the SWF file including the header. If this is an 
+uncompressed SWF (FWS signature), the FileLength field should exactly match the file size. If 
+this is a compressed SWF (CWS signature), the FileLength field indicates the total length of the 
+file after decompression, and thus will generally not match the file size. Having the uncompressed size available can make the decompression process more efficient. 
+文件长度字段代表包括文件头整个文件的总长度．如果是一个未压缩的SWF文件(FWS标识符)，文件长度字段表示文件的精确大小；如果是一个压缩的SWF文件(CWS标识)，文件长度字段表示解压后文件的大小，这样一般就不是实际文件的大小了．让未压缩（解压后）的大小可见，则可以使解压过程更加有效． 
+
+The FrameSize field defines the width and height of the movie. This is stored as a RECT 
+structure, meaning that its size may vary according to the number of bits needed to encode the 
+coordinates. The FrameSize RECT always has Xmin and Ymin of 0; the Xmax and Ymax 
+members define the width and height (see Using Bit Values). 
+帧大小字段表示影片的宽度和高度．它存在一个RECT结构中，表示它的大小可以根据坐标(四个点的坐标)数值的变化而变化．文件大小RECT通常是这样的形式：Xmin和Ymin成员都为0；Xmax和Ymax成员声明宽度和高度．(参考Using Bit Values一节)
+
+The FrameRate is the desired playback rate in frames per second. This rate is not guaranteed if the 
+SWF file contains streaming sound data, or Flash Player is running on a slow CPU. 
+帧速率表示理想的每秒播放帧数．如果SWF文件包含声音流数据，或者Flash播放器运行在一个慢的CPU上，这个速率是不能保证的．
+
+The FrameCount is the total number of frames in this SWF movie. 
+帧数表示SWF影片总的帧数目．
+
+SWF File Structure
+SWF文件结构
+
+Following the header is a series of tagged data blocks. All tags share a common format, so any
+program parsing a SWF file can skip over blocks it does not understand. Data inside the block can
+point to offsets within the block, but can never point to an offset in another block. This enables
+tags to be removed, inserted, or modified by tools that process a SWF file.
+在文件头后面的是一些标签化的数据块。所有的标签都是用一种通用格式。所以任何程序在解析一个SWF文件时，都可以跳过那些还不明确的块。在每个块中的数据可以指向这个块中的偏移量，但绝不能指向另外一个块的偏移量。这样，在用工具处理SWF文件的时候就任意可以删除、插入和修改(而SWF文件不会被破坏)。
+
+Tag Format
+标签格式
+
+Each tag begins with a tag type and a length. There are two tag header formats, short and long.
+Short tag headers are used for tags with 62 bytes of data or less. Long tag headers can be used for
+any tag size up to 4GB, far larger than is presently practical.
+每个标签都以标签类型和长度开头。标签头格式有两种，短型和长型。短型标签头用在数据不超过62字节的标签；长型标签头则可用在比实际用到的大小大得多的4GB之内的任何标签中。
+
+标签头(短型)
+字段                                              类型         备注
+TagCodeAndLength（标签类型和长度）标签类型和长度  16位的数字   高10位：标签类型 低6位：标签长度
+
+Note: The TagCodeAndLength field is a two-byte word, not a bitfield of 10 bits followed by a bitfield
+of 6 bits. The little-endian byte ordering of SWF makes these two layouts different.
+The length specified in the TagCodeAndLength field does not include the RECORDHEADER
+that starts a tag.
+TagCodeAndLength字段是一个占两字节的字，而不是一个10位二进制字段后面跟着6位二进制字段。
+If the tag is 63 bytes or longer, it is stored in a long tag header. The long tag header consists of a
+short tag header with a length of 0x3f, followed by a 32-bit length.
+假如标签是63字节或者更长，它具有长型标签头。长型标签头就好像一个以0x3f开头的短型标签头，后面跟着一个32位长度。
+标签头(长型)
+字段  备注  长度
+是一个占两字节的字类型
+TagCodeAndLength（标签类型和长度）标签类型和长度16位长度标签类型和标签长度(这儿的标签长度不是真实的)合起来是0x3f,包装起来像短型标签头
+32位长度标签类型和标签长度标签长度
+
+Definition and Control Tags
+定义型标签和控制型标签
+
+There are two categories of tags in SWF:
+Definition Tags These tags define the content of the SWF movie – the shapes, text, bitmaps,
+sounds, and so on. Each definition tag assigns a unique ID called a character ID to the content it
+defines. Flash Player then stores the character in a repository called the dictionary. Definition
+tags, by themselves, do not cause anything to be rendered.
+Control Tags These tags create and manipulate rendered instances of characters in the
+dictionary, and control the flow of the movie.
+SWF有两种类类型的标签：
+定义型标签：这类标签定义SWF影片的内容，如各种形状，文字，位图，声音等等。每个定义型标签在内容被定义都分配了一个唯一的标识号给它，这叫做角色标识(character ID)。.flash播放器则把这些角色放到一个存储空间里面，这个存储空间我们一般叫它字典。用定义型tag是不会绘制任何图形的，不会产生任何动画的。
+控制型标签：这类标签用来产生和操作字典中的角色实例的渲染,并且控制影片的流程。
+
+Tag Ordering in SWF
+SWF标签的排序
+
+Generally speaking, tags in a SWF can occur in any order. However, there are a few rules that
+must be observed:
+1 A tag should only depend on tags that come before it. A tag should never depend on a tag that
+comes later in the file.
+2 A definition tag that defines a character must occur before any control tag that refers to that
+character.
+3 Streaming sound tags must be in order. Out-of-order streaming sound tags will result in the
+sound being played out of order.
+4 The End tag is always the last tag in the SWF file.
+总的来说，标签可以出现任何情况的排序方法，但也不是随便乱排， 它遵循一些规则：
+1.一个标签只能依靠在它之前的标签，不能依靠在它之后的标签.
+2.一个定义了角色的定义型标签必须在引用这个角色的控制型标签之前。
+3.流媒体标签必须有顺序，没有顺序的流媒体播放起来也是没有顺序的
+4.结束标签(tag)应该在SWF文件的最后。
+
+The Dictionary 
+字典
+
+The dictionary is a repository of characters that have been defined, and are available for use by Control Tags. The process of building and using the dictionary is as follows: 1 A definition tag defines some content, such as a shape, font, bitmap, or sound. 2 A unique CharacterId is assigned to the content by the definition tag. 3 The content is saved in the dictionary under the CharacterId. 4 A control tag retrieves the content from the dictionary using the CharacterId, and performs some action on the content, such as displaying a shape, or playing a sound. Every definition tag must specify a unique ID. Duplicate IDs are not allowed. Typically, the first CharacterId is 1, the second CharacterId is 2, and so on. Character zero is special and considered a null character. Control tags are not the only tags that reference the dictionary. Definition tags can use characters from the dictionary to define more complex characters. For example, the DefineButton and DefineSprite tags refer to other characters to define their contents. The DefineText tag can refer to font characters to select different fonts for the text.
+字典是已经定义好的所有角色的仓库,并且可以通过控制型标签来使用它。建立和使用字典的过程是以下这样的：1.一个定义型标签定义了一些内容，如形体，字体，位图或者声音。２.定义型标签给该内容赋上一个唯一的角色标识(CharacterID)。３.依据角色标识把内容存到字典中。4.　一个控制型标签根据角色标识从字典中找出相应的内容，然后给这个内容执行一些动作，比如显示一个形体，或者播放一个声音。每个控制型标签都只指定一个唯一的标识。相同的标识是不允许的。举个象征性的例子，第一个角色的标识是1，第二个角色的标识是2，依次类推。角色标识为0的是一个特殊的标识，被看作是空角色。控制型标签并不是唯一指向字典的标签。定义型标签也可以指向多个角色来定义一些更复杂的角色。例如，定义按钮(DefineButton)和定义精灵(DefineSprite)标签都是根据其它角色来定义它们的内容的。定义文字(DefineText)标签可以指向字体角色来为文字选择不同的字体。
+附：Sprite一般都翻译为精灵，解释可以查相关的书籍，flash ,director等都有这个概念。
+
+
+Processing a SWF File 
+处理一个SWF文件
+
+Flash Player processes all the tags in a SWF file until a ShowFrame tag is encountered. At this point, the display list is copied to the screen and Flash Player is idle until it is time to process the next frame. The contents of the first frame are the cumulative effect of performing all the control tag operations before the first ShowFrame tag. The contents of the second frame are the cumulative effect of performing all the control tag operations from the beginning of the file to the second ShowFrame tag, and so on. 
+Flash播放器在一个显示帧标签到来之前会处理显示帧标签之前SWF文件的所有标签。在这个时候，播放列表被复制到屏幕上面，与此同时Flash播放器在处理下一帧之前是空闲的。第一帧所显示的内容，是在第一个显示帧标签之前的所有控制型标签操作产生的累积效果。第二帧所显示的内容，是从文件开始到第二个显示帧标签所有控制型标签操作产生的累积效果。以此类推。
+
+File Compression Strategy
+文件压缩策略
+
+Since SWF files are frequently delivered over a network connection, it is important that they be as
+compact as possible. There are several techniques that are used to accomplish this. Here are some
+things to look out for:
+既然SWF文件在网络连接中传输得非常频繁，那它们当然是越紧凑越好。有很多技术可以实现这点。这是我们选中的几种有效的策略：
+
+Reuse The structure of the character dictionary makes it very easy to reuse elements in a SWF
+file. For example, a shape, button, sound, font, or bitmap can be stored in a file once and
+referenced many times.
+重用 角色字典的结构使得重用SWF文件元素非常容易。例如，一个形体、按钮、声音、字体或者位图，可以在文件中只存一次，但用到很多次。
+
+Compression Shapes are compressed using a very efficient delta encoding scheme, often the
+first coordinate of a line is assumed to be the last coordinate of the previous one. Distances are
+also often expressed relative to the last position.
+压缩 形体使用了非常有效的差值编码方法来压缩，经常直线的开始坐标是上一条直线的最终坐标。距离经常由上一个位置的坐标来表达。
+
+Default values Some structures like matrices and color transforms have common fields that are
+used more often than others. For example, for a matrix, the most common field is the translation
+field. Scaling and rotation are less common. Therefore if the scaling field is not present, it is
+assumed to be 100%. If the rotation field is not present, it is assumed that there is no rotation.
+This use of default values helps to minimize file sizes.
+默认值 有一些结构像矩阵和色彩变换都有一些共同的属性用得比其它的多。比如一个矩阵，最常用的属性就是平移属性，而缩放与旋转则用得相对少点。因此如果没有定义缩放属性，就假定它的值为100%，如果没有定义旋转属性，就假定它的值为没有旋转。使用默认值可以使文件大小最小化。
+
+Change Encoding As a rule, SWF files only store the changes between states. This is reflected
+in shape data structures and in the place/move/remove model used by the display list.
+变化编码 作为一种规则，SWF文件只存储两种状态之间的变化。它由形体数据结构和播放列表中使用的定位／移动／移除模块反映出来。
+
+Shape Data Structure The shape data structure uses a unique structure to minimize the size of
+shapes and to render anti-aliased shapes very efficiently on the screen.
+形体数据结构 形体数据结构使用了一种独特的结构，使得形体的文件大小最小化，并且使得形体在屏幕上的平滑抗锯齿处理非常有效。
+
+Summary
+小结
+
+A SWF file is made up of a header, followed by a number of tags. There are two types of tags,
+Definition Tags and Control Tags. Definition Tags define the objects known as characters,
+which are stored in the Dictionary. Control Tags manipulate characters, and control the flow
+of the movie.
+一个SWF文件是由一个文件头，跟着一系列的标签组成的。标签类型有两种：定义型标签和控制型标签。定义型标签把所有物体定义成一个个角色，这些角色存在字典里面。控制型标签操作这些角色，并且控制影片的流程。
+    </screen>
+</sect1>
+<sect1>
+    <title>实例</title>
+    <para>
+        因为Linux下没有工具能够下载百度文库的文章，所以就分析了下文库过程，知道原来文库内容只是多个SWF的合并。
+        使用Chromium/Opera的Inspect Element工具，分析表单提交过程如下：
+    </para>
+    <screen>
+
+    </screen>
+    <para>
+        从上边的表单流程知道首先页面请求了reader.swf，然后这个reader.swf继续请求下载真正的文档内容。那么我们需要分析
+        这些数据的结构，和reader.swf如何分析这些数据。让我们先把reader.swf反汇编看看到底做了什么，其中<ulink url="http://www.showmycode.com/">showmycode</ulink>能够被使用。
+    </para>
+</sect1>

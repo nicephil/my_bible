@@ -3,7 +3,7 @@
                 version="1.0">
 
 <!--调用样式表-->
-<xsl:import href="/usr/share/xml/docbook/xsl-stylesheets-1.76.1/fo/docbook.xsl"/>
+<xsl:import href="/usr/share/xml/docbook/xsl-stylesheets-1.77.0/fo/docbook.xsl"/>
 
 <xsl:param name="body.font.family" select="'SimSun'"/> 
 <!--标准信息所使用的语言-->

@@ -3,7 +3,7 @@
                 version="1.0">
 
 <!--调用样式表-->
-<xsl:import href="/usr/share/xml/docbook/xsl-stylesheets-1.76.1/html/chunk.xsl"/>
+<xsl:import href="/usr/share/xml/docbook/xsl-stylesheets-1.77.0/html/chunk.xsl"/>
 
 <xsl:param name="chunker.output.encoding" select="'utf-8'"/> 
 <!--标准信息所使用的语言-->
