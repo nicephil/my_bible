@@ -1,0 +1,229 @@
+<sect1>
+    <title>目标文件内容</title>
+编译器生成的文件叫做目标文件。
+Linux下的ELF分为：
+可重定向文件
+可执行文件
+共享目标文件
+核心转储文件
+<para> 
+<screen>
+C语言编译后生成的机器码放在.text段，
+已经初始化的全局变量和局部静态变量保存在.data段，
+未初始化全局变量和局部静态变量放在.bss段。未初始化的全局变量和局部静态变量的默认值是0
+全局未初始化变量只是预留一个未定义的全局变量符号，等最终链接成可执行文件的时候才放在.bss段,另外如果初始化值是0的变量也放在了.bss段，不占磁盘空间
+objdump -h 查看各段的基本信息
+objdump -x 输出更多信息
+另外还有
+只读数据段.rodata,比如print的常量字符串，可以放在ROM里 
+注释信息段.comment，编译器版本信息
+堆栈提示段.note.GNU-stack
+.debug 调试信息
+.dynamic 动态链接信息
+.has 符号哈希表
+.line 调试行号
+.note 额外编译器信息
+.strtab 字符串表
+.symtab 符号表
+.shstrtab 段名表
+.plt
+.got 动态链接的跳转表和全局入口表
+.init
+.fini 程序初始化与终结代码段
+插入一段二进制文件：
+phil~/repos/my_bible $ objcopy -I binary -O elf32-i386 -B i386 images/caution.png image.o
+phil~/repos/my_bible $ objdump -ht image.o
+
+image.o:     file format elf32-i386
+
+Sections:
+Idx Name          Size      VMA       LMA       File off  Algn
+  0 .data         000004e2  00000000  00000000  00000034  2**0
+                    CONTENTS, ALLOC, LOAD, DATA
+                    SYMBOL TABLE:
+                    00000000 l    d  .data  00000000 .data
+                    00000000 g       .data  00000000 _binary_images_caution_png_start
+                    000004e2 g       .data  00000000 _binary_images_caution_png_end
+                    000004e2 g       *ABS*  00000000 _binary_images_caution_png_size
+
+插入二进制，并指定段：
+objcopy -I binary -O elf32-i386 -B i386 --rename-section .data=.rodata,alloc,load,readonly,data,contents images/caution.png image.o
+phil~/repos/my_bible $ objdump -ht image.o
+
+image.o:     file format elf32-i386
+
+Sections:
+Idx Name          Size      VMA       LMA       File off  Algn
+  0 .rodata       000004e2  00000000  00000000  00000034  2**0
+                    CONTENTS, ALLOC, LOAD, READONLY, DATA
+                    SYMBOL TABLE:
+                    00000000 l    d  .rodata        00000000 .rodata
+                    00000000 g       .rodata        00000000 _binary_images_caution_png_start
+                    000004e2 g       .rodata        00000000 _binary_images_caution_png_end
+                    000004e2 g       *ABS*  00000000 _binary_images_caution_png_size
+
+
+如何提取代码段：
+objcopy -O binary -j .text simaplesection.o text.bin
+如何反编译指定二进制文件：
+objdump -b binary -m i386 -D aa
+如何添加自定义段：
+__attribute__((section("FOO"))) int global = 43;
+__attribute__((section("BAR"))) void foo () {}
+
+
+段描述符结构：
+sh_name 段名表的偏移
+sh_type 类型
+PROGBITS, SYMTAB, STRTAB, RELA, HASH, DYNAMIC, NOTE, NOBITS, REL, SHLIB, DNYSYM
+sh_flags 属性
+WRITE, ALLOC, EXECINSTR
+sh_addr 段虚拟地址
+sh_offset 文件中偏移
+sh_size 长度
+sh_link,sh_info 段链接信息
+DYNAMIC 字符串表在段表中下标，0
+HASH  符号表在段表中下标，0
+REL 相应符号表在段表中下标，重定位表所作用的段下标
+RELA
+SYMTAB 操作系统相关，操作系统相关
+DYNSYM
+sh_addralign 段地址对齐信息
+sh_entsize 段项长度
+
+重定位表：
+.rel.text SHT_REL，针对.text段的重定位表,sh_link表示使用的符号表下标，sh_info表示作用于哪个段
+
+字符串表：
+字符串表，段表字符串表
+
+
+链接的接口-符号：
+A定义了函数，B引用了A中的函数，将函数和变量统称符号Symbol，函数名或变量名就是符号名。每个定义的符号对应的值叫符号值。
+定义在本目标文件的全局符号
+在本目标文件中引用的全局符号
+段名
+局部符号
+行号信息
+
+ELF符号表结构：
+st_name 符号名
+st_value 对应的值
+如果是符号的定义并不是COMMON块类型，表示该符号在段中的偏移
+如果符号在COMMON块，表示符号的对齐属性
+如果在可执行文件中，表示符号的虚拟地址
+st_size 大小
+st_info 符号类型和绑定信息
+低4位表示符号类型，高28位表示绑定信息
+OBJECT 1 数据对象，变量或数组
+FUNC 2 函数或可执行代码
+SECTION 3 段
+FILE 4 文件名，所在段必须是ABS
+LOCAL 局部符号
+GLOBAL 全局符号
+WEAK 弱引用
+st_other 0
+st_shndx 符号所在段
+ABS 包含绝对地址
+COMMON 未初始化全局符号
+UNDEF 符号未定义
+
+
+特殊符号：
+__executable_start:程序起始地址
+__etext,_etext,etext:代码段结束地址
+_edata或edata,数据段结束地址
+_end,end,程序结束地址
+phil~/repos/my_bible $ nm simplesection
+080495e4 d _DYNAMIC
+080496d0 d _GLOBAL_OFFSET_TABLE_
+080484cc R _IO_stdin_used
+         w _ITM_deregisterTMCloneTable
+         w _ITM_registerTMCloneTable
+         w _Jv_RegisterClasses
+080485d4 r __FRAME_END__
+080495e0 d __JCR_END__
+080495e0 d __JCR_LIST__
+080496f8 D __TMC_END__
+080496f8 A __bss_start
+080496e8 D __data_start
+080483a0 t __do_global_dtors_aux
+080495dc t __do_global_dtors_aux_fini_array_entry
+080496ec D __dso_handle
+080495d8 t __frame_dummy_init_array_entry
+         w __gmon_start__
+080495dc t __init_array_end
+080495d8 t __init_array_start
+080484b0 T __libc_csu_fini
+08048440 T __libc_csu_init
+         U __libc_start_main@@GLIBC_2.0
+08048324 T __x86.get_pc_thunk.bx
+080496f8 A _edata
+08049704 A _end
+080484b4 T _fini
+080484c8 R _fp_hw
+08048294 T _init
+08048300 T _start
+080496f8 b completed.6340
+080496e8 W data_start
+08048330 t deregister_tm_clones
+080483c0 t frame_dummy
+080483ec T func1
+080496f0 D global_init_var
+080496fc B global_uninit_var
+08048407 T main
+         U printf@@GLIBC_2.0
+08048360 t register_tm_clones
+080496f4 d static_var.1365
+08049700 b static_var2.1366
+
+符号修饰，函数签名：
+为了防止符号名冲突，UNIX下C规定，C语言源码文件的所有全局变量和函数经过编译后在相应的符号名前加上下划线_
+C++引进了名字空间的方法来解决多模块的符号冲突。
+GCC默认下去掉了添加的_号，通过参数-fleading-underscore,-fno-leading-underscore打开和关闭C语言符号前的下划线。
+
+C++符号修饰：
+GCC下：
+int func(int) _Z4funci
+fload func(float) _Z4funcf
+int C::func(int) _ZN1C4funcEi
+int C::C2::func(int) _ZN1C2C24funcEi
+int N::func(int) _ZN1N4funcEi
+int N::C::func(int) _ZN1N1C4funcEi
+
+c++filt 能够解析别修饰过的符号名称
+
+C++编译器提供了extern "C" 有一个声明或定义C的符号
+C++定义了宏__cplusplus来区别C编译器
+比如
+#ifdef __cplusplus
+extern "C" {
+#endif
+void *memset (void*, int, size_t);
+
+#ifdef __cplusplus
+}
+#endif
+
+
+弱符号和强符号：
+编译器默认任何函数和初始化了的全局变量为强符号，可以使用
+__attribute__((weak))来定义弱符号
+不允许强符号被定义多次
+如果一个符号在目标文件里是强符号，其它文件中是弱符号，选择强符号
+如果一个符号在所有目标文件中都是弱符号，选择占空间最大的一个
+
+弱引用和强引用：
+链接器不认为未定义的弱符号是错误，链接器默认其值为0.
+GCC可使用__attribute__((weakref)) void foo();声明对一个外部符号使用弱引用。
+
+弱符号可以让用户定义自己版本的库函数
+或者用户弱引用某些扩展功能的函数，去掉某些功能也能正常链接。
+
+
+调试信息：
+DWARF3定义了调试信息格式
+使用strip可以去掉ELF文件中的调试信息
+</screen>
+</para>
+</sect1>

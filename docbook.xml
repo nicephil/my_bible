@@ -5,6 +5,7 @@ PUBLIC "-//OASIS//DTD DocBook XML V4.5/zh_cn" "http://www.oasis-open.org/docbook
 <!ENTITY swf_format SYSTEM "swf_format.xml">
 <!ENTITY compile_link SYSTEM "compile_link.xml">
 <!ENTITY object_file SYSTEM "object_file.xml">
+<!ENTITY static_link SYSTEM "static_link.xml">
 ]>
 <book>
     <info>
@@ -34,7 +35,7 @@ PUBLIC "-//OASIS//DTD DocBook XML V4.5/zh_cn" "http://www.oasis-open.org/docbook
     </chapter>
 
     <chapter>  
-        <title>History</title>
+        <title>静态链接</title>
     </chapter>
 
     <chapter>  
