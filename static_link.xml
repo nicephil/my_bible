@@ -8,4 +8,48 @@
 </sect1>
 <sect1>
     <title>符号解析与重定位</title>
+    <screen>
+静态链接前的指令：
+objdump -d a:
+00000000 <main>:
+   0:   55                      push   %ebp
+   1:   89 e5                   mov    %esp,%ebp
+   3:   83 e4 f0                and    $0xfffffff0,%esp
+   6:   83 ec 20                sub    $0x20,%esp
+   9:   c7 44 24 1c 64 00 00    movl   $0x64,0x1c(%esp)
+  10:   00 
+  11:   c7 44 24 04 00 00 00    movl   $0x0,0x4(%esp) //shared变量0
+  18:   00 
+  19:   8d 44 24 1c             lea    0x1c(%esp),%eax
+  1d:   89 04 24                mov    %eax,(%esp)
+  20:   e8 fc ff ff ff          call   21 <main+0x21> // swap函数
+  25:   c9                      leave  
+  26:   c3                      ret   
+
+静态链接之后：
+objdump -d ab:
+08048094 <main>:
+ 8048094:       55                      push   %ebp
+ 8048095:       89 e5                   mov    %esp,%ebp
+ 8048097:       83 e4 f0                and    $0xfffffff0,%esp
+ 804809a:       83 ec 20                sub    $0x20,%esp
+ 804809d:       c7 44 24 1c 64 00 00    movl   $0x64,0x1c(%esp)
+ 80480a4:       00 
+ 80480a5:       c7 44 24 04 54 91 04    movl   $0x8049154,0x4(%esp) //shared被重新定位
+ 80480ac:       08 
+ 80480ad:       8d 44 24 1c             lea    0x1c(%esp),%eax
+ 80480b1:       89 04 24                mov    %eax,(%esp)
+ 80480b4:       e8 03 00 00 00          call   80480bc <swap> // swap被重新定位
+ 80480b9:       c9                      leave  
+ 80480ba:       c3                      ret    
+ 80480bb:       90                      nop
+
+080480bc <swap>:
+ 80480bc:       55                      push   %ebp
+
+    </screen>
+    <screen>
+重定位表：
+对于可重定位的ELF，必须包含重定位表，用来描述修改相应的段里的内容
+    </screen>
 </sect1>
