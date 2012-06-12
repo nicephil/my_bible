@@ -51,5 +51,634 @@ objdump -d ab:
     <screen>
 重定位表：
 对于可重定位的ELF，必须包含重定位表，用来描述修改相应的段里的内容
+
+RELOCATION RECORDS FOR [.text]:
+OFFSET   TYPE              VALUE 
+00000015 R_386_32          shared
+00000021 R_386_PC32        swap
+
+RELOCATION RECORDS FOR [.eh_frame]:
+OFFSET   TYPE              VALUE 
+00000020 R_386_PC32        .text
+每个要被重定位的地方叫一个重定位入口，
+重定位入口的偏移表示该入口在要重定位段中的位置
+r_offset 重定位入口的偏移
+r_info 重定位入口的类型和符号，低8位表示重定位入口的类型，高24位表示重定位入口符号在符号表的下标
+符号解析：
+重定位过程伴随着符号解析过程，每个重定位入口都是对一个符号的引用，那么当链接器需对某个符号进行重定位时，它就要确定这个符号的目标地址。，这时链接器就会查找由所有输入目标文件的符号表组成的全局符号表，找到相应的符号后进行重定位。
+    </screen>
+    <screen>
+指令修正方式：
+对于x86系列CPU寻址如下：
+近址寻址或远址寻址
+绝对寻址或相对寻址
+寻址长度为8位，16位，32位或64位
+重定位入口所修正指令寻址方式:
+绝对近址32位寻址
+相对近址32位寻址
+每个被修正的位置的长度位32位，4字节。
+R_386_32 1 绝对寻址修正S+A
+R_386_PC32 2 相对寻址修正S+A-P
+A=保存在被修正位置的值
+P=被修正的位置（相对于段开始的偏移量或虚拟地址），
+S=符号的实际地址
+
+readelf -s ab
+08049154     4 OBJECT  GLOBAL DEFAULT    3 shared
+objdump -d a.o
+11:   c7 44 24 04 00 00 00    movl   $0x0,0x4(%esp)
+
+对于shared的绝对寻址修正：S+A
+S是符号shared的实际地址：08049154
+A是被修正位置的值：0
+最终重定位入口处的修正后地址为：08049154
+objdump -d ab
+ 80480a5:       c7 44 24 04 54 91 04    movl   $0x8049154,0x4(%esp)
+
+readelf -s ab
+     7: 080480bc    58 FUNC    GLOBAL DEFAULT    1 swap
+
+objdump -d a.o
+ 20:   e8 fc ff ff ff          call   21 <main+0x21>
+
+objdump -r a.o
+RELOCATION RECORDS FOR [.text]:
+OFFSET   TYPE              VALUE 
+00000015 R_386_32          shared
+00000021 R_386_PC32        swap
+
+readelf -s ab
+    10: 08048094    39 FUNC    GLOBAL DEFAULT    1 main
+
+
+对于swap的相对寻址修正：S+A-P
+S是swap的实际地址：080480bc
+A是被修正位置的值：fffffffc(-4)
+P是被修正的位置：08048094+21=080480B5
+重定位入口被修正的地址为:080480bc-4-080480b5=3
+objdump -d ab
+ 80480b4:       e8 03 00 00 00          call   80480bc <swap>
+    </screen>
+
+    <screen>
+COMMON块：
+编译器将未初始化的全局变量定义为弱符号处理，类型为SHN_COMMON类型。按照COMMON块类型的链接原则，符号大小以输入文件中最大的那个为准。
+如果链接过程中出现弱符号大小大于强符号，ld将警告。
+未初始化的全局变量在COMMON块，而未初始化的局部静态变量在BSS段。
+GCC的"-fno-common"允许把所有未初始化全局变量不以COMMON块的形式处理，或者使用__attribute__扩展：
+int global __attribute__((nocommon));，一旦一个未初始化的全局变量不以COMMON块形式存在，他们相当于一个强符号。
+    </screen>
+
+    <screen>
+C++问题：
+重复代码消除：模板，外部内联函数，虚函数表
+将每个模板的实例代码单独存放在一个段，每个段只包含一个模板实例，链接器将合并他们。
+GCC把这种类似的需要在最终链接时合并的段叫Link Once。.gnu.linkonce.name, 其中name是该模板函数实例的修饰后名字。
+由于不同的编译单元使用不同的编译器版本或优化选项，导致同一个函数编译出的实际代码有所不同，链接器会随意选择其中一个副本，并提供一个警告信息
+函数级别链接：
+由于现在的库都很大，一个目标文件包含很多函数，当我们需要用到某个目标文件中的一个函数或变量，就需要把它整个链接进去，为了不链接哪些没有用的函数。GCC提供了两个选项"-ffunction-sections"和"-fdata-sections"将每个函数和变量分别保持到独立的段中。
+    </screen>
+
+    <screen>
+全局构造与析构：
+linux系统中的一般程序的入口是_stat，是Linux系统库Glibc的一部分。
+.init 保存了可执行指令，当一个程序开始运行时，在main函数之前Glibc的初始化部分安排来执行这个段的代码。
+.fini 该段保存了进程终止代码指令，当一个程序的main函数正常退出时，Glibc会安排执行这个段代码。
+
+ABI：
+如果想要使两个不同编译器编译出的目标文件能相互链接，那么必须满足：采用相同的目标文件格式，拥有相同的符号修饰标准，变量的内存分布方式相同，函数的调用方式相同，等，其中符号修饰标准，变量内存布局，函数调用方式等统称ABI。
+影响ABI的因素很多，硬件，编程语言，编译器，链接器，操作系统等都会影响ABI。
+    </screen>
+
+
+    <screen>
+静态库链接：
+静态库是一组目标文件的集合：/usr/lib/libc.a
+ar -t libc.a查看这个文件包含了哪些目标文件
+objdump -t libc.a 查看库中的符号
+GCC会将只使用一个字符串的参数printf替换为内建的puts函数来提高速度，可使用-fno-builtin来避免。
+
+ gcc -static --verbose -fno-builtin hello.c -o hello 
+ Using built-in specs.
+ COLLECT_GCC=gcc
+ COLLECT_LTO_WRAPPER=/usr/lib/gcc/i686-pc-linux-gnu/4.7.0/lto-wrapper
+ Target: i686-pc-linux-gnu
+ Configured with: /build/src/gcc-4.7-20120505/configure --prefix=/usr --libdir=/usr/lib --libexecdir=/usr/lib --mandir=/usr/share/man --infodir=/usr/share/info --with-bugurl=https://bugs.archlinux.org/ --enable-languages=c,c++,ada,fortran,go,lto,objc,obj-c++ --enable-shared --enable-threads=posix --with-system-zlib --enable-__cxa_atexit --disable-libunwind-exceptions --enable-clocale=gnu --disable-libstdcxx-pch --enable-libstdcxx-time --enable-gnu-unique-object --enable-linker-build-id --with-ppl --enable-cloog-backend=isl --enable-lto --enable-gold --enable-ld=default --enable-plugin --with-plugin-ld=ld.gold --with-linker-hash-style=gnu --disable-multilib --disable-libssp --disable-build-with-cxx --disable-build-poststage1-with-cxx --enable-checking=release
+ Thread model: posix
+ gcc version 4.7.0 20120505 (prerelease) (GCC) 
+ COLLECT_GCC_OPTIONS='-static' '-v' '-fno-builtin' '-o' 'hello' '-mtune=generic' '-march=pentiumpro'
+ ================> 编译
+  /usr/lib/gcc/i686-pc-linux-gnu/4.7.0/cc1 -quiet -v hello.c -quiet -dumpbase hello.c -mtune=generic -march=pentiumpro -auxbase hello -version -fno-builtin -o /tmp/ccLfIykL.s
+
+  GNU C (GCC) version 4.7.0 20120505 (prerelease) (i686-pc-linux-gnu)
+          compiled by GNU C version 4.7.0 20120505 (prerelease), GMP version 5.0.4, MPFR version 3.1.0-p7, MPC version 0.9
+          warning: GMP header version 5.0.4 differs from library version 5.0.5.
+          warning: MPFR header version 3.1.0-p7 differs from library version 3.1.0-p10.
+          GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072
+          ignoring nonexistent directory "/usr/lib/gcc/i686-pc-linux-gnu/4.7.0/../../../../i686-pc-linux-gnu/include"
+          #include "..." search starts here:
+          #include <...> search starts here:
+           /usr/lib/gcc/i686-pc-linux-gnu/4.7.0/include
+            /usr/local/include
+             /usr/lib/gcc/i686-pc-linux-gnu/4.7.0/include-fixed
+              /usr/include
+              End of search list.
+              GNU C (GCC) version 4.7.0 20120505 (prerelease) (i686-pc-linux-gnu)
+                      compiled by GNU C version 4.7.0 20120505 (prerelease), GMP version 5.0.4, MPFR version 3.1.0-p7, MPC version 0.9
+                      warning: GMP header version 5.0.4 differs from library version 5.0.5.
+                      warning: MPFR header version 3.1.0-p7 differs from library version 3.1.0-p10.
+                      GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072
+                      Compiler executable checksum: ae9f50ff69288273d0617f1faed4f487
+                      COLLECT_GCC_OPTIONS='-static' '-v' '-fno-builtin' '-o' 'hello' '-mtune=generic' '-march=pentiumpro'
+===================>汇编
+                       as --32 -o /tmp/cc4voK9t.o /tmp/ccLfIykL.s
+
+                       COMPILER_PATH=/usr/lib/gcc/i686-pc-linux-gnu/4.7.0/:/usr/lib/gcc/i686-pc-linux-gnu/4.7.0/:/usr/lib/gcc/i686-pc-linux-gnu/:/usr/lib/gcc/i686-pc-linux-gnu/4.7.0/:/usr/lib/gcc/i686-pc-linux-gnu/
+                       LIBRARY_PATH=/usr/lib/gcc/i686-pc-linux-gnu/4.7.0/:/usr/lib/gcc/i686-pc-linux-gnu/4.7.0/../../../:/lib/:/usr/lib/
+                       COLLECT_GCC_OPTIONS='-static' '-v' '-fno-builtin' '-o' 'hello' '-mtune=generic' '-march=pentiumpro'
+===========>链接
+                        /usr/lib/gcc/i686-pc-linux-gnu/4.7.0/collect2 --build-id --hash-style=gnu -m elf_i386 -static -o hello /usr/lib/gcc/i686-pc-linux-gnu/4.7.0/../../../crt1.o /usr/lib/gcc/i686-pc-linux-gnu/4.7.0/../../../crti.o /usr/lib/gcc/i686-pc-linux-gnu/4.7.0/crtbeginT.o -L/usr/lib/gcc/i686-pc-linux-gnu/4.7.0 -L/usr/lib/gcc/i686-pc-linux-gnu/4.7.0/../../.. /tmp/cc4voK9t.o --start-group -lgcc -lgcc_eh -lc --end-group /usr/lib/gcc/i686-pc-linux-gnu/4.7.0/crtend.o /usr/lib/gcc/i686-pc-linux-gnu/4.7.0/../../../crtn.o
+
+collect2是ld链接器的一个包装，收集所有与程序初始化相关的信息并构造初始化的结构。
+crt1.o,crti.o,crtbeginT.o
+libgcc.a, libgcc_eh.a, libc.a
+crtend.o crtn.o
+    </screen>
+
+
+
+    <screen>
+链接过程控制：
+操作系统内核，BIOS，或没有操作系统下运行的程序，内核驱动程序。
+控制方法：
+使用命令行给链接器指定参数
+将链接指令放在目标文件里
+使用链接控制脚本
+
+ld的默认链接脚本在/usr/lib/ldscripts
+普通可执行ELF使用elf_i386.x
+共享库链接脚本elf_i386.xs
+ld -static --verbose
+  Supported emulations:
+   elf_i386
+   i386linux
+   elf32_x86_64
+using internal linker script:
+==================================================
+/* Script for -z combreloc: combine and sort reloc sections */
+OUTPUT_FORMAT("elf32-i386", "elf32-i386",
+              "elf32-i386")
+OUTPUT_ARCH(i386)
+ENTRY(_start)
+SEARCH_DIR("/usr/i686-pc-linux-gnu/lib"); SEARCH_DIR("/usr/local/lib"); SEARCH_DIR("/lib"); SEARCH_DIR("/usr/lib");
+SECTIONS
+{
+  /* Read-only sections, merged into text segment: */
+  PROVIDE (__executable_start = SEGMENT_START("text-segment", 0x08048000)); . = SEGMENT_START("text-segment", 0x08048000) + SIZEOF_HEADERS;
+  .interp         : { *(.interp) }
+  .note.gnu.build-id : { *(.note.gnu.build-id) }
+  .hash           : { *(.hash) }
+  .gnu.hash       : { *(.gnu.hash) }
+  .dynsym         : { *(.dynsym) }
+  .dynstr         : { *(.dynstr) }
+  .gnu.version    : { *(.gnu.version) }
+  .gnu.version_d  : { *(.gnu.version_d) }
+  .gnu.version_r  : { *(.gnu.version_r) }
+  .rel.dyn        :
+    {
+      *(.rel.init)
+      *(.rel.text .rel.text.* .rel.gnu.linkonce.t.*)
+      *(.rel.fini)
+      *(.rel.rodata .rel.rodata.* .rel.gnu.linkonce.r.*)
+      *(.rel.data.rel.ro* .rel.gnu.linkonce.d.rel.ro.*)
+      *(.rel.data .rel.data.* .rel.gnu.linkonce.d.*)
+      *(.rel.tdata .rel.tdata.* .rel.gnu.linkonce.td.*)
+      *(.rel.tbss .rel.tbss.* .rel.gnu.linkonce.tb.*)
+      *(.rel.ctors)
+      *(.rel.dtors)
+      *(.rel.got)
+      *(.rel.bss .rel.bss.* .rel.gnu.linkonce.b.*)
+      *(.rel.ifunc)
+    }
+  .rel.plt        :
+    {
+      *(.rel.plt)
+      PROVIDE_HIDDEN (__rel_iplt_start = .);
+      *(.rel.iplt)
+      PROVIDE_HIDDEN (__rel_iplt_end = .);
+    }
+  .init           :
+  {
+    KEEP (*(.init))
+  } =0x90909090
+  .plt            : { *(.plt) *(.iplt) }
+  .text           :
+  {
+    *(.text.unlikely .text.*_unlikely)
+    *(.text.exit .text.exit.*)
+    *(.text.startup .text.startup.*)
+    *(.text.hot .text.hot.*)
+    *(.text .stub .text.* .gnu.linkonce.t.*)
+    /* .gnu.warning sections are handled specially by elf32.em.  */
+    *(.gnu.warning)
+  } =0x90909090
+  .fini           :
+  {
+    KEEP (*(.fini))
+  } =0x90909090
+  PROVIDE (__etext = .);
+  PROVIDE (_etext = .);
+  PROVIDE (etext = .);
+  .rodata         : { *(.rodata .rodata.* .gnu.linkonce.r.*) }
+  .rodata1        : { *(.rodata1) }
+  .eh_frame_hdr : { *(.eh_frame_hdr) }
+  .eh_frame       : ONLY_IF_RO { KEEP (*(.eh_frame)) }
+  .gcc_except_table   : ONLY_IF_RO { *(.gcc_except_table
+  .gcc_except_table.*) }
+  /* These sections are generated by the Sun/Oracle C++ compiler.  */
+  .exception_ranges   : ONLY_IF_RO { *(.exception_ranges
+  .exception_ranges*) }
+  /* Adjust the address for the data segment.  We want to adjust up to
+     the same address within the page on the next page up.  */
+  . = ALIGN (CONSTANT (MAXPAGESIZE)) - ((CONSTANT (MAXPAGESIZE) - .) & (CONSTANT (MAXPAGESIZE) - 1)); . = DATA_SEGMENT_ALIGN (CONSTANT (MAXPAGESIZE), CONSTANT (COMMONPAGESIZE));
+  /* Exception handling  */
+  .eh_frame       : ONLY_IF_RW { KEEP (*(.eh_frame)) }
+  .gcc_except_table   : ONLY_IF_RW { *(.gcc_except_table .gcc_except_table.*) }
+  .exception_ranges   : ONLY_IF_RW { *(.exception_ranges .exception_ranges*) }
+  /* Thread Local Storage sections  */
+  .tdata          : { *(.tdata .tdata.* .gnu.linkonce.td.*) }
+  .tbss           : { *(.tbss .tbss.* .gnu.linkonce.tb.*) *(.tcommon) }
+  .preinit_array     :
+  {
+    PROVIDE_HIDDEN (__preinit_array_start = .);
+    KEEP (*(.preinit_array))
+    PROVIDE_HIDDEN (__preinit_array_end = .);
+  }
+  .init_array     :
+  {
+    PROVIDE_HIDDEN (__init_array_start = .);
+    KEEP (*(SORT_BY_INIT_PRIORITY(.init_array.*) SORT_BY_INIT_PRIORITY(.ctors.*)))
+    KEEP (*(.init_array))
+    KEEP (*(EXCLUDE_FILE (*crtbegin.o *crtbegin?.o *crtend.o *crtend?.o ) .ctors))
+    PROVIDE_HIDDEN (__init_array_end = .);
+  }
+  .fini_array     :
+  {
+    PROVIDE_HIDDEN (__fini_array_start = .);
+    KEEP (*(SORT_BY_INIT_PRIORITY(.fini_array.*) SORT_BY_INIT_PRIORITY(.dtors.*)))
+    KEEP (*(.fini_array))
+    KEEP (*(EXCLUDE_FILE (*crtbegin.o *crtbegin?.o *crtend.o *crtend?.o ) .dtors))
+    PROVIDE_HIDDEN (__fini_array_end = .);
+  }
+  .ctors          :
+  {
+    /* gcc uses crtbegin.o to find the start of
+       the constructors, so we make sure it is
+       first.  Because this is a wildcard, it
+       doesn't matter if the user does not
+       actually link against crtbegin.o; the
+       linker won't look for a file to match a
+       wildcard.  The wildcard also means that it
+       doesn't matter which directory crtbegin.o
+       is in.  */
+    KEEP (*crtbegin.o(.ctors))
+    KEEP (*crtbegin?.o(.ctors))
+    /* We don't want to include the .ctor section from
+       the crtend.o file until after the sorted ctors.
+       The .ctor section from the crtend file contains the
+       end of ctors marker and it must be last */
+    KEEP (*(EXCLUDE_FILE (*crtend.o *crtend?.o ) .ctors))
+    KEEP (*(SORT(.ctors.*)))
+    KEEP (*(.ctors))
+  }
+  .dtors          :
+  {
+    KEEP (*crtbegin.o(.dtors))
+    KEEP (*crtbegin?.o(.dtors))
+    KEEP (*(EXCLUDE_FILE (*crtend.o *crtend?.o ) .dtors))
+    KEEP (*(SORT(.dtors.*)))
+    KEEP (*(.dtors))
+  }
+  .jcr            : { KEEP (*(.jcr)) }
+  .data.rel.ro : { *(.data.rel.ro.local* .gnu.linkonce.d.rel.ro.local.*) *(.data.rel.ro* .gnu.linkonce.d.rel.ro.*) }
+  .dynamic        : { *(.dynamic) }
+  .got            : { *(.got) *(.igot) }
+  . = DATA_SEGMENT_RELRO_END (12, .);
+  .got.plt        : { *(.got.plt)  *(.igot.plt) }
+  .data           :
+  {
+    *(.data .data.* .gnu.linkonce.d.*)
+    SORT(CONSTRUCTORS)
+  }
+  .data1          : { *(.data1) }
+  _edata = .; PROVIDE (edata = .);
+  __bss_start = .;
+  .bss            :
+  {
+   *(.dynbss)
+   *(.bss .bss.* .gnu.linkonce.b.*)
+   *(COMMON)
+   /* Align here to ensure that the .bss section occupies space up to
+      _end.  Align after .bss to ensure correct alignment even if the
+      .bss section disappears because there are no input sections.
+      FIXME: Why do we need it? When there is no .bss section, we don't
+      pad the .data section.  */
+   . = ALIGN(. != 0 ? 32 / 8 : 1);
+  }
+  . = ALIGN(32 / 8);
+  . = ALIGN(32 / 8);
+  _end = .; PROVIDE (end = .);
+  . = DATA_SEGMENT_END (.);
+  /* Stabs debugging sections.  */
+  .stab          0 : { *(.stab) }
+  .stabstr       0 : { *(.stabstr) }
+  .stab.excl     0 : { *(.stab.excl) }
+  .stab.exclstr  0 : { *(.stab.exclstr) }
+  .stab.index    0 : { *(.stab.index) }
+  .stab.indexstr 0 : { *(.stab.indexstr) }
+  .comment       0 : { *(.comment) }
+  /* DWARF debug sections.
+     Symbols in the DWARF debugging sections are relative to the beginning
+     of the section so we begin them at 0.  */
+  /* DWARF 1 */
+  .debug          0 : { *(.debug) }
+  .line           0 : { *(.line) }
+  /* GNU DWARF 1 extensions */
+  .debug_srcinfo  0 : { *(.debug_srcinfo) }
+  .debug_sfnames  0 : { *(.debug_sfnames) }
+  /* DWARF 1.1 and DWARF 2 */
+  .debug_aranges  0 : { *(.debug_aranges) }
+  .debug_pubnames 0 : { *(.debug_pubnames) }
+  /* DWARF 2 */
+  .debug_info     0 : { *(.debug_info .gnu.linkonce.wi.*) }
+  .debug_abbrev   0 : { *(.debug_abbrev) }
+  .debug_line     0 : { *(.debug_line) }
+  .debug_frame    0 : { *(.debug_frame) }
+  .debug_str      0 : { *(.debug_str) }
+  .debug_loc      0 : { *(.debug_loc) }
+  .debug_macinfo  0 : { *(.debug_macinfo) }
+  /* SGI/MIPS DWARF 2 extensions */
+  .debug_weaknames 0 : { *(.debug_weaknames) }
+  .debug_funcnames 0 : { *(.debug_funcnames) }
+  .debug_typenames 0 : { *(.debug_typenames) }
+  .debug_varnames  0 : { *(.debug_varnames) }
+  /* DWARF 3 */
+  .debug_pubtypes 0 : { *(.debug_pubtypes) }
+  .debug_ranges   0 : { *(.debug_ranges) }
+  .gnu.attributes 0 : { KEEP (*(.gnu.attributes)) }
+  /DISCARD/ : { *(.note.GNU-stack) *(.gnu_debuglink) *(.gnu.lto_*) }
+}
+
+
+==================================================
+ld -shared --verbose
+
+GNU ld (GNU Binutils) 2.22.0.20120323
+  Supported emulations:
+   elf_i386
+   i386linux
+   elf32_x86_64
+using internal linker script:
+==================================================
+/* Script for --shared -z combreloc: shared library, combine & sort relocs */
+OUTPUT_FORMAT("elf32-i386", "elf32-i386",
+              "elf32-i386")
+OUTPUT_ARCH(i386)
+ENTRY(_start)
+SEARCH_DIR("/usr/i686-pc-linux-gnu/lib"); SEARCH_DIR("/usr/local/lib"); SEARCH_DIR("/lib"); SEARCH_DIR("/usr/lib");
+SECTIONS
+{
+  /* Read-only sections, merged into text segment: */
+  . = SEGMENT_START("text-segment", 0) + SIZEOF_HEADERS;
+  .note.gnu.build-id : { *(.note.gnu.build-id) }
+  .hash           : { *(.hash) }
+  .gnu.hash       : { *(.gnu.hash) }
+  .dynsym         : { *(.dynsym) }
+  .dynstr         : { *(.dynstr) }
+  .gnu.version    : { *(.gnu.version) }
+  .gnu.version_d  : { *(.gnu.version_d) }
+  .gnu.version_r  : { *(.gnu.version_r) }
+  .rel.dyn        :
+    {
+      *(.rel.init)
+      *(.rel.text .rel.text.* .rel.gnu.linkonce.t.*)
+      *(.rel.fini)
+      *(.rel.rodata .rel.rodata.* .rel.gnu.linkonce.r.*)
+      *(.rel.data.rel.ro* .rel.gnu.linkonce.d.rel.ro.*)
+      *(.rel.data .rel.data.* .rel.gnu.linkonce.d.*)
+      *(.rel.tdata .rel.tdata.* .rel.gnu.linkonce.td.*)
+      *(.rel.tbss .rel.tbss.* .rel.gnu.linkonce.tb.*)
+      *(.rel.ctors)
+      *(.rel.dtors)
+      *(.rel.got)
+      *(.rel.bss .rel.bss.* .rel.gnu.linkonce.b.*)
+      *(.rel.ifunc)
+    }
+  .rel.plt        :
+    {
+      *(.rel.plt)
+      *(.rel.iplt)
+    }
+  .init           :
+  {
+    KEEP (*(.init))
+  } =0x90909090
+  .plt            : { *(.plt) *(.iplt) }
+  .text           :
+  {
+    *(.text.unlikely .text.*_unlikely)
+    *(.text.exit .text.exit.*)
+    *(.text.startup .text.startup.*)
+    *(.text.hot .text.hot.*)
+    *(.text .stub .text.* .gnu.linkonce.t.*)
+    /* .gnu.warning sections are handled specially by elf32.em.  */
+    *(.gnu.warning)
+  } =0x90909090
+  .fini           :
+  {
+    KEEP (*(.fini))
+  } =0x90909090
+  PROVIDE (__etext = .);
+  PROVIDE (_etext = .);
+  PROVIDE (etext = .);
+  .rodata         : { *(.rodata .rodata.* .gnu.linkonce.r.*) }
+  .rodata1        : { *(.rodata1) }
+  .eh_frame_hdr : { *(.eh_frame_hdr) }
+  .eh_frame       : ONLY_IF_RO { KEEP (*(.eh_frame)) }
+  .gcc_except_table   : ONLY_IF_RO { *(.gcc_except_table
+  .gcc_except_table.*) }
+  /* These sections are generated by the Sun/Oracle C++ compiler.  */
+  .exception_ranges   : ONLY_IF_RO { *(.exception_ranges
+  .exception_ranges*) }
+  /* Adjust the address for the data segment.  We want to adjust up to
+     the same address within the page on the next page up.  */
+  . = ALIGN (CONSTANT (MAXPAGESIZE)) - ((CONSTANT (MAXPAGESIZE) - .) & (CONSTANT (MAXPAGESIZE) - 1)); . = DATA_SEGMENT_ALIGN (CONSTANT (MAXPAGESIZE), CONSTANT (COMMONPAGESIZE));
+  /* Exception handling  */
+  .eh_frame       : ONLY_IF_RW { KEEP (*(.eh_frame)) }
+  .gcc_except_table   : ONLY_IF_RW { *(.gcc_except_table .gcc_except_table.*) }
+  .exception_ranges   : ONLY_IF_RW { *(.exception_ranges .exception_ranges*) }
+  /* Thread Local Storage sections  */
+  .tdata          : { *(.tdata .tdata.* .gnu.linkonce.td.*) }
+  .tbss           : { *(.tbss .tbss.* .gnu.linkonce.tb.*) *(.tcommon) }
+  .preinit_array     :
+  {
+    KEEP (*(.preinit_array))
+  }
+  .init_array     :
+  {
+    KEEP (*(SORT_BY_INIT_PRIORITY(.init_array.*) SORT_BY_INIT_PRIORITY(.ctors.*)))
+    KEEP (*(.init_array))
+    KEEP (*(EXCLUDE_FILE (*crtbegin.o *crtbegin?.o *crtend.o *crtend?.o ) .ctors))
+  }
+  .fini_array     :
+  {
+    KEEP (*(SORT_BY_INIT_PRIORITY(.fini_array.*) SORT_BY_INIT_PRIORITY(.dtors.*)))
+    KEEP (*(.fini_array))
+    KEEP (*(EXCLUDE_FILE (*crtbegin.o *crtbegin?.o *crtend.o *crtend?.o ) .dtors))
+  }
+  .ctors          :
+  {
+    /* gcc uses crtbegin.o to find the start of
+       the constructors, so we make sure it is
+       first.  Because this is a wildcard, it
+       doesn't matter if the user does not
+       actually link against crtbegin.o; the
+       linker won't look for a file to match a
+       wildcard.  The wildcard also means that it
+       doesn't matter which directory crtbegin.o
+       is in.  */
+    KEEP (*crtbegin.o(.ctors))
+    KEEP (*crtbegin?.o(.ctors))
+    /* We don't want to include the .ctor section from
+       the crtend.o file until after the sorted ctors.
+       The .ctor section from the crtend file contains the
+       end of ctors marker and it must be last */
+    KEEP (*(EXCLUDE_FILE (*crtend.o *crtend?.o ) .ctors))
+    KEEP (*(SORT(.ctors.*)))
+    KEEP (*(.ctors))
+  }
+  .dtors          :
+  {
+    KEEP (*crtbegin.o(.dtors))
+    KEEP (*crtbegin?.o(.dtors))
+    KEEP (*(EXCLUDE_FILE (*crtend.o *crtend?.o ) .dtors))
+    KEEP (*(SORT(.dtors.*)))
+    KEEP (*(.dtors))
+  }
+  .jcr            : { KEEP (*(.jcr)) }
+  .data.rel.ro : { *(.data.rel.ro.local* .gnu.linkonce.d.rel.ro.local.*) *(.data.rel.ro* .gnu.linkonce.d.rel.ro.*) }
+  .dynamic        : { *(.dynamic) }
+  .got            : { *(.got) *(.igot) }
+  . = DATA_SEGMENT_RELRO_END (12, .);
+  .got.plt        : { *(.got.plt)  *(.igot.plt) }
+  .data           :
+  {
+    *(.data .data.* .gnu.linkonce.d.*)
+    SORT(CONSTRUCTORS)
+  }
+  .data1          : { *(.data1) }
+  _edata = .; PROVIDE (edata = .);
+  __bss_start = .;
+  .bss            :
+  {
+   *(.dynbss)
+   *(.bss .bss.* .gnu.linkonce.b.*)
+   *(COMMON)
+   /* Align here to ensure that the .bss section occupies space up to
+      _end.  Align after .bss to ensure correct alignment even if the
+      .bss section disappears because there are no input sections.
+      FIXME: Why do we need it? When there is no .bss section, we don't
+      pad the .data section.  */
+   . = ALIGN(. != 0 ? 32 / 8 : 1);
+  }
+  . = ALIGN(32 / 8);
+  . = ALIGN(32 / 8);
+  _end = .; PROVIDE (end = .);
+  . = DATA_SEGMENT_END (.);
+  /* Stabs debugging sections.  */
+  .stab          0 : { *(.stab) }
+  .stabstr       0 : { *(.stabstr) }
+  .stab.excl     0 : { *(.stab.excl) }
+  .stab.exclstr  0 : { *(.stab.exclstr) }
+  .stab.index    0 : { *(.stab.index) }
+  .stab.indexstr 0 : { *(.stab.indexstr) }
+  .comment       0 : { *(.comment) }
+  /* DWARF debug sections.
+     Symbols in the DWARF debugging sections are relative to the beginning
+     of the section so we begin them at 0.  */
+  /* DWARF 1 */
+  .debug          0 : { *(.debug) }
+  .line           0 : { *(.line) }
+  /* GNU DWARF 1 extensions */
+  .debug_srcinfo  0 : { *(.debug_srcinfo) }
+  .debug_sfnames  0 : { *(.debug_sfnames) }
+  /* DWARF 1.1 and DWARF 2 */
+  .debug_aranges  0 : { *(.debug_aranges) }
+  .debug_pubnames 0 : { *(.debug_pubnames) }
+  /* DWARF 2 */
+  .debug_info     0 : { *(.debug_info .gnu.linkonce.wi.*) }
+  .debug_abbrev   0 : { *(.debug_abbrev) }
+  .debug_line     0 : { *(.debug_line) }
+  .debug_frame    0 : { *(.debug_frame) }
+  .debug_str      0 : { *(.debug_str) }
+  .debug_loc      0 : { *(.debug_loc) }
+  .debug_macinfo  0 : { *(.debug_macinfo) }
+  /* SGI/MIPS DWARF 2 extensions */
+  .debug_weaknames 0 : { *(.debug_weaknames) }
+  .debug_funcnames 0 : { *(.debug_funcnames) }
+  .debug_typenames 0 : { *(.debug_typenames) }
+  .debug_varnames  0 : { *(.debug_varnames) }
+  /* DWARF 3 */
+  .debug_pubtypes 0 : { *(.debug_pubtypes) }
+  .debug_ranges   0 : { *(.debug_ranges) }
+  .gnu.attributes 0 : { KEEP (*(.gnu.attributes)) }
+  /DISCARD/ : { *(.note.GNU-stack) *(.gnu_debuglink) *(.gnu.lto_*) }
+}
+
+
+==================================================
+
+
+ld -T link.script 可以指定自定义链接脚本
+
+最小程序：
+phil~/repos/my_bible $ gcc -static -c -fno-builtin tinyhelloworld.c 
+phil~/repos/my_bible $ ld -s -static -e nomain -o tinyhelloworld tinyhelloworld.o
+
+phil~/repos/my_bible $ ld -static -T tinyhelloworld.lds -s -o tinyhelloworld tinyhelloworld.o
+
+链接器脚本语法：
+命令语句：
+ENTRY(nomain)
+赋值语句：
+.=0x08480000+SIZEOF_HEADERS
+语句间使用;作为分隔符，
+可以使用C语言中的运算符
+文件名中有双引号的无法处理
+/**/作为注释
+
+ENTRY(symbol)指定symbol的值为入口地址，ld命令行-e，链接脚本ENTRY(symbol)，定义的_start符号，.text段的基址，值0
+STARTUP(filename)将文件filename作为第一个输入文件链接
+SEARCH_DIR(path)将路径path加入链接器库查找目录， -Lpath
+INPUT(file, file, ...) INPUT(file file ...)将指定文件作为链接过程中输入文件
+INCLUDE filename 将文件filename包含进链接器脚本中
+PROVIDE(symbol)在链接脚本中定义某个符号
+
+SECTIONS
+{
+...
+    secname : { contents }
+}
+secname为输出段的名字，其中/DISCARD/表示丢弃段
+contents的规则：
+可以包含若干条件，每个条件用空格隔开，
+filename(sections) 输入文件名，的输入段名
+[a-z'*(.text*[A-Z])表示所有输入文件中以小写字母开头的文件中所有段名以.text开头，并以大写字母结尾的段
+    </screen>
+
+
+    <screen>
+BFD库：
+Binary File Descriptor Library， 它把目标文件抽象成一个统一模型，使得BFD库的程序只要通过操作这个抽象的目标文件模型就可以实现操作所有BFD支持的目标文件格式。现在的汇编器，链接器，调试器和binutils的其它工具都是通过BFD库来处理目标文件的。
     </screen>
 </sect1>
