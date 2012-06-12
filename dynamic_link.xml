@@ -1,0 +1,111 @@
+<sect1>
+    <title>动态链接的原因</title>
+    <screen>
+内存和磁盘空间的浪费
+程序开发，更新，部署和发布
+程序可扩展性和兼容性
+    </screen>
+</sect1>
+<sect1>
+    <title>基本思想</title>
+    <screen>
+把程序按照模块拆分为各个相对独立部分，在程序运行时才将他们链接在一起。涉及到存储管理，内存共享，进程线程等机制。
+当程序被装载时，系统的动态链接器会将程序所需要的所有动态链接库装载到进程的地址空间，并将程序中所有未决议的符号绑定到相应的动态链接库中，并进行重定位工作。
+动态链接会导致一些程序在性能的损失，使用延迟绑定（Lazy Binding）等方法优化，动态链接比静态链接损失了%5以下。
+gcc -fPIC -shared -o lib.so lib.c
+gcc -o program1 program1.c ./lib.so
+在链接时动态库还是需要的，因为目标文件引用的外部定义的符号，链接器不知道应该是静态的还是动态的，如果发现这个符号是定义在动态库中的动态符号，链接器对其进行特殊用途。
+phil~/repos/my_bible $ cat /proc/9781/maps
+08048000-08049000 r-xp 00000000 08:04 8926205    /home/phil/repos/my_bible/program1
+08049000-0804a000 rw-p 00000000 08:04 8926205    /home/phil/repos/my_bible/program1
+b7579000-b757a000 rw-p 00000000 00:00 0 
+b757a000-b7715000 r-xp 00000000 08:03 130333     /lib/libc-2.15.so
+b7715000-b7716000 ---p 0019b000 08:03 130333     /lib/libc-2.15.so
+b7716000-b7718000 r--p 0019b000 08:03 130333     /lib/libc-2.15.so
+b7718000-b7719000 rw-p 0019d000 08:03 130333     /lib/libc-2.15.so
+b7719000-b771c000 rw-p 00000000 00:00 0 
+b7732000-b7733000 rw-p 00000000 00:00 0 
+b7733000-b7734000 r-xp 00000000 08:04 8926204    /home/phil/repos/my_bible/lib.so
+b7734000-b7735000 rw-p 00000000 08:04 8926204    /home/phil/repos/my_bible/lib.so
+b7735000-b7736000 rw-p 00000000 00:00 0 
+b7736000-b7737000 r-xp 00000000 00:00 0          [vdso]
+b7737000-b7757000 r-xp 00000000 08:03 130342     /lib/ld-2.15.so
+b7757000-b7758000 r--p 0001f000 08:03 130342     /lib/ld-2.15.so
+b7758000-b7759000 rw-p 00020000 08:03 130342     /lib/ld-2.15.so
+bfd83000-bfda4000 rw-p 00000000 00:00 0          [stack]
+可知，动态链接器也被映射到了进程的地址空间，在系统开始运行program1之前，首先会把控制权交给动态链接器，由它完成所有的动态链接工作以后再把控制权交给program1,然后开始执行。
+
+phil~/repos/my_bible $ readelf -l lib.so
+
+Elf file type is DYN (Shared object file)
+Entry point 0x420
+There are 6 program headers, starting at offset 52
+
+Program Headers:
+  Type           Offset   VirtAddr   PhysAddr   FileSiz MemSiz  Flg Align
+  LOAD           0x000000 0x00000000 0x00000000 0x00638 0x00638 R E 0x1000
+  LOAD           0x000638 0x00001638 0x00001638 0x00120 0x00124 RW  0x1000
+  DYNAMIC        0x000644 0x00001644 0x00001644 0x000e0 0x000e0 RW  0x4
+  NOTE           0x0000f4 0x000000f4 0x000000f4 0x00024 0x00024 R   0x4
+  GNU_EH_FRAME   0x0005b8 0x000005b8 0x000005b8 0x0001c 0x0001c R   0x4
+  GNU_STACK      0x000000 0x00000000 0x00000000 0x00000 0x00000 RW  0x4
+
+ Section to Segment mapping:
+  Segment Sections...
+   00     .note.gnu.build-id .gnu.hash .dynsym .dynstr .gnu.version .gnu.version_r .rel.dyn .rel.plt .init .plt .text .fini .rodata .eh_frame_hdr .eh_frame 
+   01     .init_array .fini_array .jcr .dynamic .got .got.plt .data .bss 
+   02     .dynamic 
+   03     .note.gnu.build-id 
+   04     .eh_frame_hdr 
+   05     
+共享对象的最终装载地址在编译时是不确定的，而是在装载时，装载器根据当前地址空间的空闲情况，动态分配一块足够大小的虚拟地址空间给相应的共享对象。
+
+    </screen>
+</sect1>
+<sect1>
+    <title>地址无关代码</title>
+    <screen>
+共享对象在编译时不能假设自己在进程虚拟地址空间中的位置。
+为了能够使共享对象在任意地址装载，
+    </screen>
+</sect1>
+<sect1>
+    <title></title>
+    <screen>
+    </screen>
+</sect1>
+<sect1>
+    <title></title>
+    <screen>
+    </screen>
+</sect1>
+<sect1>
+    <title></title>
+    <screen>
+    </screen>
+</sect1>
+<sect1>
+    <title></title>
+    <screen>
+    </screen>
+</sect1>
+<sect1>
+    <title></title>
+    <screen>
+    </screen>
+</sect1>
+<sect1>
+    <title></title>
+    <screen>
+    </screen>
+</sect1>
+<sect1>
+    <title></title>
+    <screen>
+    </screen>
+</sect1>
+<sect1>
+    <title></title>
+    <screen>
+    </screen>
+</sect1>

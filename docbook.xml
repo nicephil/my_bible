@@ -6,6 +6,8 @@ PUBLIC "-//OASIS//DTD DocBook XML V4.5/zh_cn" "http://www.oasis-open.org/docbook
 <!ENTITY compile_link SYSTEM "compile_link.xml">
 <!ENTITY object_file SYSTEM "object_file.xml">
 <!ENTITY static_link SYSTEM "static_link.xml">
+<!ENTITY load_process SYSTEM "load_process.xml">
+<!ENTITY dynamic_link SYSTEM "dynamic_link.xml">
 ]>
 <book>
     <info>
@@ -36,14 +38,17 @@ PUBLIC "-//OASIS//DTD DocBook XML V4.5/zh_cn" "http://www.oasis-open.org/docbook
 
     <chapter>  
         <title>静态链接</title>
+        &static_link;
     </chapter>
 
     <chapter>  
-        <title>History</title>
+        <title>进程装载</title>
+        &load_process;
     </chapter>
 
     <chapter>  
-        <title>History</title>
+        <title>动态链接</title>
+        &dynamic_link;
     </chapter>
 
     <chapter>  

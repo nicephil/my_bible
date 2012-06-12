@@ -8,10 +8,11 @@
 </sect1>
 <sect1>
     <title>符号解析与重定位</title>
+
     <screen>
 静态链接前的指令：
 objdump -d a:
-00000000 <main>:
+00000000 &lt;main&gt;:
    0:   55                      push   %ebp
    1:   89 e5                   mov    %esp,%ebp
    3:   83 e4 f0                and    $0xfffffff0,%esp
@@ -22,13 +23,13 @@ objdump -d a:
   18:   00 
   19:   8d 44 24 1c             lea    0x1c(%esp),%eax
   1d:   89 04 24                mov    %eax,(%esp)
-  20:   e8 fc ff ff ff          call   21 <main+0x21> // swap函数
+  20:   e8 fc ff ff ff          call   21 &lt;main+0x21&gt; // swap函数
   25:   c9                      leave  
   26:   c3                      ret   
 
 静态链接之后：
 objdump -d ab:
-08048094 <main>:
+08048094 &lt;main&gt;:
  8048094:       55                      push   %ebp
  8048095:       89 e5                   mov    %esp,%ebp
  8048097:       83 e4 f0                and    $0xfffffff0,%esp
@@ -39,12 +40,12 @@ objdump -d ab:
  80480ac:       08 
  80480ad:       8d 44 24 1c             lea    0x1c(%esp),%eax
  80480b1:       89 04 24                mov    %eax,(%esp)
- 80480b4:       e8 03 00 00 00          call   80480bc <swap> // swap被重新定位
+ 80480b4:       e8 03 00 00 00          call   80480bc &lt;swap&gt; // swap被重新定位
  80480b9:       c9                      leave  
  80480ba:       c3                      ret    
  80480bb:       90                      nop
 
-080480bc <swap>:
+080480bc &lt;swap&gt;:
  80480bc:       55                      push   %ebp
 
     </screen>
@@ -67,6 +68,7 @@ r_info 重定位入口的类型和符号，低8位表示重定位入口的类型
 符号解析：
 重定位过程伴随着符号解析过程，每个重定位入口都是对一个符号的引用，那么当链接器需对某个符号进行重定位时，它就要确定这个符号的目标地址。，这时链接器就会查找由所有输入目标文件的符号表组成的全局符号表，找到相应的符号后进行重定位。
     </screen>
+
     <screen>
 指令修正方式：
 对于x86系列CPU寻址如下：
@@ -99,7 +101,7 @@ readelf -s ab
      7: 080480bc    58 FUNC    GLOBAL DEFAULT    1 swap
 
 objdump -d a.o
- 20:   e8 fc ff ff ff          call   21 <main+0x21>
+ 20:   e8 fc ff ff ff          call   21 &lt;main+0x21&gt;
 
 objdump -r a.o
 RELOCATION RECORDS FOR [.text]:
@@ -117,7 +119,7 @@ A是被修正位置的值：fffffffc(-4)
 P是被修正的位置：08048094+21=080480B5
 重定位入口被修正的地址为:080480bc-4-080480b5=3
 objdump -d ab
- 80480b4:       e8 03 00 00 00          call   80480bc <swap>
+ 80480b4:       e8 03 00 00 00          call   80480bc &lt;swap&gt;
     </screen>
 
     <screen>
@@ -177,7 +179,7 @@ GCC会将只使用一个字符串的参数printf替换为内建的puts函数来�
           GGC heuristics: --param ggc-min-expand=100 --param ggc-min-heapsize=131072
           ignoring nonexistent directory "/usr/lib/gcc/i686-pc-linux-gnu/4.7.0/../../../../i686-pc-linux-gnu/include"
           #include "..." search starts here:
-          #include <...> search starts here:
+          #include &lt;...&gt; search starts here:
            /usr/lib/gcc/i686-pc-linux-gnu/4.7.0/include
             /usr/local/include
              /usr/lib/gcc/i686-pc-linux-gnu/4.7.0/include-fixed
@@ -300,7 +302,7 @@ SECTIONS
   .exception_ranges*) }
   /* Adjust the address for the data segment.  We want to adjust up to
      the same address within the page on the next page up.  */
-  . = ALIGN (CONSTANT (MAXPAGESIZE)) - ((CONSTANT (MAXPAGESIZE) - .) & (CONSTANT (MAXPAGESIZE) - 1)); . = DATA_SEGMENT_ALIGN (CONSTANT (MAXPAGESIZE), CONSTANT (COMMONPAGESIZE));
+  . = ALIGN (CONSTANT (MAXPAGESIZE)) - ((CONSTANT (MAXPAGESIZE) - .) &amp; (CONSTANT (MAXPAGESIZE) - 1)); . = DATA_SEGMENT_ALIGN (CONSTANT (MAXPAGESIZE), CONSTANT (COMMONPAGESIZE));
   /* Exception handling  */
   .eh_frame       : ONLY_IF_RW { KEEP (*(.eh_frame)) }
   .gcc_except_table   : ONLY_IF_RW { *(.gcc_except_table .gcc_except_table.*) }
@@ -440,7 +442,7 @@ GNU ld (GNU Binutils) 2.22.0.20120323
    elf32_x86_64
 using internal linker script:
 ==================================================
-/* Script for --shared -z combreloc: shared library, combine & sort relocs */
+/* Script for --shared -z combreloc: shared library, combine &amp; sort relocs */
 OUTPUT_FORMAT("elf32-i386", "elf32-i386",
               "elf32-i386")
 OUTPUT_ARCH(i386)
@@ -512,7 +514,7 @@ SECTIONS
   .exception_ranges*) }
   /* Adjust the address for the data segment.  We want to adjust up to
      the same address within the page on the next page up.  */
-  . = ALIGN (CONSTANT (MAXPAGESIZE)) - ((CONSTANT (MAXPAGESIZE) - .) & (CONSTANT (MAXPAGESIZE) - 1)); . = DATA_SEGMENT_ALIGN (CONSTANT (MAXPAGESIZE), CONSTANT (COMMONPAGESIZE));
+  . = ALIGN (CONSTANT (MAXPAGESIZE)) - ((CONSTANT (MAXPAGESIZE) - .) &amp; (CONSTANT (MAXPAGESIZE) - 1)); . = DATA_SEGMENT_ALIGN (CONSTANT (MAXPAGESIZE), CONSTANT (COMMONPAGESIZE));
   /* Exception handling  */
   .eh_frame       : ONLY_IF_RW { KEEP (*(.eh_frame)) }
   .gcc_except_table   : ONLY_IF_RW { *(.gcc_except_table .gcc_except_table.*) }
