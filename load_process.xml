@@ -1,0 +1,108 @@
+<sect1>
+    <title>进程</title>
+    <screen>
+linux 32位进程虚拟地址空间：
+0xFFFFFFFF      -------
+            OS    1GB
+0xC0000000      -------
+
+            User  3GB
+           Space
+
+0x00000000      -------
+进程创建：
+创建独立的虚拟地址空间
+读取可执行文件头，并建立空间与可执行文件的映射关系
+将CPU的指令寄存器设置成可执行文件入口地址，启动运行
+
+ELF文件链接试图和执行试图：
+以代码段为代表的权限是可读可执行的段
+以数据段,BSS段为代表的权限是可读可写的段
+以只读数据段为代表的只读段
+
+对于相同权限的段，把他们合并到一起当作一个段进行映射."Segment"包含一个或多个属性相类似的"Section"
+
+readelf -l sectionmapping 查看多少各Segment
+Elf file type is EXEC (Executable file)
+Entry point 0x8048cf8
+There are 5 program headers, starting at offset 52
+
+Program Headers:
+  Type           Offset   VirtAddr   PhysAddr   FileSiz MemSiz  Flg Align
+  LOAD           0x000000 0x08048000 0x08048000 0xa334b 0xa334b R E 0x1000
+  LOAD           0x0a334c 0x080ec34c 0x080ec34c 0x00cd4 0x023c0 RW  0x1000
+  NOTE           0x0000d4 0x080480d4 0x080480d4 0x00044 0x00044 R   0x4
+  TLS            0x0a334c 0x080ec34c 0x080ec34c 0x00010 0x00028 R   0x4
+  GNU_STACK      0x000000 0x00000000 0x00000000 0x00000 0x00000 RW  0x4
+
+ Section to Segment mapping:
+  Segment Sections...
+   00     .note.ABI-tag .note.gnu.build-id .rel.plt .init .plt .text __libc_thread_freeres_fn __libc_freeres_fn .fini .rodata __libc_thread_subfreeres __libc_subfreeres __libc_atexit .eh_frame .gcc_except_table 
+   01     .tdata .init_array .fini_array .jcr .data.rel.ro .got .got.plt .data .bss __libc_freeres_ptrs 
+   02     .note.ABI-tag .note.gnu.build-id 
+   03     .tdata .tbss 
+   04    
+
+其中NOTE，TLS，GNU_STACK在装载时起辅助作用。
+所有相同属性的“Section”被归类到一个“Segment”，并映射到同一个VMA。
+
+程序头表：
+p_type 类型：LOAD，DYNAMIC，INTERP
+p_offset 文件中偏移
+p_vaddr 在进程虚拟空间的起始位置
+p_paddr 物理装载位置
+p_filesz “Segment”的大小
+p_memsz "Segment"在虚拟地址空间中的长度
+p_flags 权限属性， R W X
+p_align 对齐属性
+    </screen>
+
+    <screen>
+堆和栈：
+可以通过查看/proc来获取进程虚拟地址空间分配
+phil~/repos/my_bible $ cat /proc/7841/maps 
+
+08048000-080ec000 r-xp 00000000 08:04 8926198    /home/phil/repos/my_bible/sectionmapping
+
+080ec000-080ee000 rw-p 000a3000 08:04 8926198    /home/phil/repos/my_bible/sectionmapping
+
+080ee000-080ef000 rw-p 00000000 00:00 0 
+
+0934c000-0936e000 rw-p 00000000 00:00 0          [heap]
+
+b7744000-b7745000 r-xp 00000000 00:00 0          [vdso]
+
+bf8ea000-bf90b000 rw-p 00000000 00:00 0          [stack]
+vdso是一个内核的模块，进程可以通过访问这个VMA跟内核通信。
+linux映射完第二个Segment之后，把最后一个页面的剩余部分清0,然后调用内核的do_brk()，把.bss和__libcfreeres_ptrs的剩余部分放在堆段上，可看fs/Binfmt_elf.c中的load_elf_interp()和elf_map()
+
+堆的最大申请数量：
+受到的影响是操作系统版本，程序本身大小，用到的动态/共享库的数量，大小，程序栈数量，大小等，甚至每次运行的结果不一样，特别是随机地址空间分布的特性被使用后。
+
+进程栈初始化：
+系统环境变量和进程的运行参数，操作系统在进程启动前将这些信息提前保存在虚拟空间的栈中。
+
+    </screen>
+</sect1>
+
+<sect1>
+    <title>Linunx内核装载ELF过程</title>
+    <screen>
+当用户输入一个命令执行一个ELF程序时，
+首先在用户空间，bash调用fork()系统调用创建一个新的进程，
+然后调用execve()执行指定的ELF文件，之前的bash进程返回等待才启动的新进程的结束。
+在内核中，execve()对应的入口是sys_execve()定义在arch\i386\kernel\Process.c，sys_execve()进行一些参数的检查复制之后，调用do_execve()。do_execve()首先查找被执行的文件，读取文件的前128字节，判断文件的格式，然后调用search_binary_handle()取去搜索和匹配合适的可执行文件装载处理过程。
+search_binary_handle()会通过判断文件头部的魔数确定文件的格式，并调用相应的装载处理过程。
+比如ELF可执行文件的装载处理load_elf_binary().
+a.out可执行文件的装载处理load_aout_binary().
+脚本的装载处理load_script().
+其中load_elf_binary()定义在fs/Binfmt_elf.c：
+检查ELF可执行文件的有效性
+寻找动态链接的.interp段，设置动态链接器路径
+根据ELF可执行文件的程序头表的描述，对ELF文件进行映射
+初始化ELF进程环境，比如进程启动时EDX寄存器的地址应该是DT_FINI的地址
+将系统调用的返回地址改成ELF可执行文件的入口点，对于静态链接的ELF可执行文件，这个程序入口就是ELF文件中的e_entry，对于动态链接的ELF，程序入口点是动态链接器。
+当load_elf_binary()执行完毕，返回至do_execve()再返回至sys_execve()时，已经把系统调用的返回地址改成了ELF程序入口地址。
+所以sys_execve()系统调用从内核态返回到用户态时EIP寄存器直接跳转到了ELF程序的入口地址，于是新的程序开始执行，ELF可执行文件装载完成。
+    </screen>
+</sect1>
