@@ -98,7 +98,7 @@ Linux GCC支持装载时重定位，如果只使用-shared那么输出的共享�
 第三种：模块外部的函数调用，跳转等
 在数据段里建立一个指向目标函数的指针数组，当模块需要调用目标函数时，可以通过GOT中的项进行间接跳转。
 先得到但前指令地址PC，然后加上一个偏移得到函数地址在GOT中的偏移，然后一个间接调用
-54f:   e8 40 00 00 00          call   594 <__x86.get_pc_thunk.cx>
+54f:   e8 40 00 00 00          call   594 &lt;__x86.get_pc_thunk.cx&gt;
 554:   81 c1 20 12 00 00       add    $0x1220,%ecx
 55a:   c7 81 24 00 00 00 01    movl   $0x1,0x24(%ecx)
 561:   00 00 00 
@@ -128,7 +128,7 @@ Linux GCC支持装载时重定位，如果只使用-shared那么输出的共享�
 
 数据段地址无关性：
 static int a;
-static int *p = &a;
+static int *p = &amp;a;
 那么p就是一个绝对地址，会随着共享对象的装载地址变化而变化。
 对于数据段，它在每个进程中都有一份独立的副本，可以在装载时重定位来解决数据段的绝对地址引用问题。对于共享对象，如果数据段有绝对地址引用，那么编译器和链接器会产生一个重定位表，R_386_RELATIVE,当动态链接器加载共享对象时，如果发现该共享对象有这样的重定位入口，那么动态链接器会对该对象重定位。
 
@@ -317,7 +317,7 @@ R_386_GLOB_DAT对.got的重定位跟R_386_JUMP_SLOT一样。
 对于R_386_RELATIVE类型的重定位入口，实际就是基址重置，共享对象的数据段是无法做到地址无关的，它可能包含绝对地址，需要在装载时重定位。
 例如
 static int a;
-static int *p = &a;
+static int *p = &amp;a;
 在编译时共享对象起始位置是0,假设静态变量a相对于起始地址0的偏移是B，那么p的值是B，一旦共享对象被装载到地址A，那么a的地址是B+A，那么p的值需要加上A。
 如果ELF文件以PIC编译，并调用一个外部函数bar()，那么bar会出现在.rel.plt中，如果不是以PIC模式编译的，则bar将出现在.rel.dyn中。
 
@@ -360,7 +360,7 @@ AT_BASE 7 表示动态链接器本身的装载地址
 AT_ENTRY 9 可执行文件入口地址
 
 它位于环境变量指针的后面
-
+<programlisting>
 int main (int argc, char **argv)
 {
     int *p = (int *)argv;
@@ -369,7 +369,7 @@ int main (int argc, char **argv)
 
     printf ("Argument count: %d\n", *(p-1));
 
-    for (i = 0; i < *(p-1); ++i) {
+    for (i = 0; i &lt; *(p-1); ++i) {
         printf ("Argument %d: %s\n", i, *(p+i));
     }
 
@@ -393,18 +393,124 @@ int main (int argc, char **argv)
     }
     return 0;
 }
-
+</programlisting>
  
     </screen>
 </sect1>
 <sect1>
     <title>动态链接的步骤和实现</title>
     <screen>
+动态链接器自举：
+动态链接器本身也是一个共享对象，但是它不能依赖任何其他共享对象，本身所需要的全局和静态变量的重定位工作由它本身完成。自举（Bootstrap）。
+自举代码首先找到自己的GOT，而GOT的第一个入口是.dynamic段偏移地址，通过.dynamic中的信息，自举代码可以获得动态链接器本身的重定位表和符号表等，从而得到动态链接器本身的重定位入口，先将他们全部重定位，然后，动态链接器代码才可以使用自己的全局变量和静态变量。
+
+在自举代码中不可以使用全局变量和静态变量，甚至不能调用函数，即使动态链接器本身的函数也不能使用，因为PIC模式下的共享对象，对于模块内部的函数调用也是采用模块外部函数调用一样使用GOT/PLT方式，所以不能调用函数。
+
+装载共享对象：
+完成基本自举以后，动态链接器将可执行文件和链接器本身的符号表合并到一个符号表，全局符号表。然后链接器开始寻找可执行文件所依赖的共享对象，在.dynamic段中DT_NEEDED，指出所依赖的共享对象。列出所有可执行文件所需要的所有共享对象，并将这些共享对象的名字放入到一个装载集合中。
+
+然后链接器开始从集合里取一个所需要的共享对象后打开该文件，读取相应的ELF文件头和.dynamic段，然后将它相应的代码段和数据段映射到进程空间中，如果这个共享对象还依赖其他共享对象，那么将所依赖的共享对象的名字放到装载集合中，装载过程就是一个图的遍历过程，一般算法使用广度优先。
+
+当一个新的共享对象被装载，它的符号表会被合并到全局符号表，当所有的共享对象都被装载进去时，全局符号表里面将包含进程中所有的动态链接所需要的符号。
+
+
+符号
+-XLiner -rpath ./ 表示链接器在当前路径寻找共享对象，否则链接器会报无法找到库
+
+一个共享对象里的全局符号被另外一个共享对象的同名全局符号覆盖的现象称为共享对象全局符号介入
+
+当一个符号需要被加入全局符号表时，如果相同的符号名已经存在，则后加入的符号被忽略。
+
+为了调高模块内部函数调用的效率，需要将函数变成私有的使用static定义函数。
+
+
+重定位和初始化：
+链接器开始重新遍历可执行文件和每个共享对象的重定位表，将他们的GOT/PLT的每个需要重定位的位置进行修正。
+完成重定位后，如果某个共享对象有.init段，那么动态链接器会执行.init段的代码，比如C++的全局/静态对象的构造。
+
+如果可执行程序也有.init段，动态链接器不会执行它，因为.init段和.finit段由程序初始化部分代码负责执行。
+
+当完成了重定位和初始化之后，动态链接器将进程的控制权交给程序的入口。
+
     </screen>
 </sect1>
 <sect1>
-    <title></title>
+    <title>Linux动态链接器的实现</title>
     <screen>
+Linux动态链接器本身是个共享对象：
+catherine~/repos/my_bible $ /lib/ld-linux.so.2 
+Usage: ld.so [OPTION]... EXECUTABLE-FILE [ARGS-FOR-PROGRAM...]
+You have invoked `ld.so', the helper program for shared library executables.
+This program usually lives in the file `/lib/ld.so', and special directives
+in executable files using ELF shared libraries tell the system's program
+loader to load the helper program from this file.  This helper program loads
+the shared libraries needed by the program executable, prepares the program
+to run, and runs it.  You may invoke this helper program directly from the
+command line to load and run an ELF executable file; this is like executing
+that file itself, but always uses this helper program from the file you
+specified, instead of the helper program file specified in the executable
+file you run.  This is mostly of use for maintainers to test new versions
+of this helper program; chances are you did not intend to run this program.
+
+  --list                list all dependencies and how they are resolved
+  --verify              verify that given object really is a dynamically linked
+                        object we can handle
+  --library-path PATH   use given PATH instead of content of the environment
+                        variable LD_LIBRARY_PATH
+  --inhibit-rpath LIST  ignore RUNPATH and RPATH information in object names
+                        in LIST
+  --audit LIST          use objects named in LIST as auditors
+
+Linux的动态链接器是Glibc的一部分，源码位于sysdeps/i386/dl-machine.h中的_start，_start()在sysdeps/i386/elf/start.S
+
+_start调用位于elf/rtld.c的_dl_start()函数，它首先对ld.so进行重定位，完成自举后就可以调用其他函数并访问全局变量了。调用_dl_start_final，收集一些基本运行参数，进入_dl_sysdep_start，这个函数进行一些平台相关的处理之后进入_dl_main,这个就是动态链接器真正的主函数。
+
+动态链接器本身是静态链接的，本身应该是PIC的，便于重定位和代码共享，本身ld.so可以直接执行，装载地址是0,作为共享库，内核在装载它时会为其选择一个合适的装载地址。
+
+
+显式运行时链接：
+运行时加载，让程序自己在运行时控制加载制定的模块，并可以在不需要该模块时将其卸载。动态装载库。
+
+在Linux中，动态库实际上跟一般的共享对象没区别。主要区别是共享对象由动态链接器在程序启动之前负责装载和链接的。而动态库是通过一系列API程序自己控制的，打开动态库dlopen(),查找符号dlsym(),错误处理dlerror(),以及关闭动态库dlclose()。&lt;dlfcn.h&gt;
+
+dlopen():
+void *dlopen (const char *filename, int flag)
+第一个参数是被加载动态库的路径，如果是绝对路径直接尝试打开，如果是相对路径，查找如下：
+a。环境变量LD_LIBRARY_PATH指定的一系列目录
+b。由/etc/ld.so.cache里面指定的共享库路径
+c。/lib,/usr/lib
+如果库在多个目录下由不同副本会导致系统极为不可靠。
+
+如果filename是0,那么dlopen会返回全局符号表的句柄，我们可以在运行时找到全局符号表里的任何符号，并可执行他们。全局符号表包含了程序的可执行文件本身，被动态链接器加载到进程中的所有共享模块已经在运行时通过dlopen打开并使用RTLD_GLOBAL方式的模块中的符号。
+
+第二个参数表示函数符号的解析方式，常量RTLD_LAZY表示使用延迟绑定，即PLT机制。而RTLD_NOW表示当模块被加载时即完成所有函数的绑定工作，如果有任何未定义的符号引用的绑定工作无法完成。另外还有RTLD_GLOBAL跟上面两种的一个配合使用，表示被加载的模块的全局符号合并到进程全局符号表中，使得以后加载的模块可以使用这些符号。
+
+dlopen返回被加载的模块的句柄，如果失败返回NULL，如果已经被加载过了返回同一个句柄。如果模块间由依赖关系，需要手动加载被依赖模块。
+
+实际上dlopen还在加载模块时执行模块中的初始化部分代码。.init段的代码。
+
+dlsym():
+void *dlsym (void *handle, char *symbol);
+第一个参数是dlopen()返回的动态库句柄
+第二个参数是所要查找的符号的名字。
+如果dlsym()找到相应的符号，返回符号的值，如果没有找到返回NULL。
+dlsym()返回值对于不同类型的符号，意义不同。
+如果查找函数符号，返回函数地址。如果查找变量符号，返回变量地址。如果查找常量符号，返回该常量的值。但如果该常量刚好是NULL或0,那么需要使用dlerror()函数。
+如果符号找到了，dlerror()返回NULL，如果没有，dlerror返回相应的错误信息。
+
+符号优先级：
+当多个同名符号冲突时，先装入的符号优先，装载序列。不管是动态链接器装入的还是dlopen()装入的，都采用装载序列。
+
+dlsym()查找符号时优先级分为两种类型。第一种情况，如果我们是在全局符号表中进行符号查找即dlopen的参数filename是NULL，那么使用装载序列。第二种情况，如果对于某个dlopen()打开的共享对象进行符号查找的话，采用依赖序列的优先级。以被dlopen()打开的共享对象为根节点，对它所依赖的共享对象进行广度优先遍历，直到直到符号为止。
+
+
+dlerror():
+判断上次调用是否成功，上次失败返回char *字符串，否则NULL。
+
+dlclose():
+将一个已经加载的模块卸载，系统维持一个加载引用计数器，每次使用dlopen()加载某模块，相应计数器加1;每次使用dlclose()卸载某模块，相应计数器减1.当计数器减到0,才真正卸载模块，先执行.fini段的代码，然后将相应符号从符号表中去除，取消进程空间的映射关系，然后关闭模块文件。
+
+
     </screen>
 </sect1>
 <sect1>
