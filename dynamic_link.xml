@@ -514,28 +514,144 @@ dlclose():
 运行时装载的程序：
 可以通过命令行来执行共享对象里的任意函数：由命令行给出共享对象路径，函数名和相关参数，然后程序通过运行时加载将该模块加载到进程中，查找相应的函数，并执行它，然后将执行结果打印出来。
 runso /lib/foobar.so function arg1 arg2 arg3 return_type
+为了支持不同的函数参数组合，通过了解函数调用约定，在调用函数之前伪造好相应的栈，为了能够直接操作栈，不得不使用嵌入汇编代码。
+
+    </screen>
+</sect1>
+<sect1>
+    <title>Linux共享库</title>
+    <screen>
+共享库兼容问题：
+往共享库添加一个导出符号，兼容
+删除共享库里的一个原有导出符号，不兼容
+将原有导出函数添加一个参数，不兼容
+删除导出函数的一个参数，不兼容
+改变一个导出结构类型的长度，内容，成员类型，不兼容
+修正一个导出函数的bug，兼容
+修正一个导出函数的bug，但改变了函数语义，功能，行为或接口类型， 不兼容
+
+C++的ABI问题更严重：
+如果需要提供一个导出接口为C++的共享库：
+不要在接口类中使用虚函数，使用了不要随意删除
+不要改变类的任何成员变量的位置和类型
+不要删除非内嵌的public和protected成员函数
+不要将非内嵌的成员函数改变成内嵌成员函数
+不要改变成员函数的访问权限
+不要在接口使用模板
+不要改变接口的任何部分或干脆不要使用C++提供共享库
+
+
+为了解决共享库的兼容问题，使用共享库版本：
+libname.so.x.y.z其中lib是前缀，中间是库名称和后缀.so,
+最后是三个数字组成的版本号。x表示主版本号，y表示次版本号，z表示发布版本号。
+主版本号，表示重大升级，不同主版本号库之间不兼容
+次版本号，表示库的增量升级，增加了一些新接口符号，并保持原来符号不变。在主版本号相同下，新的次版本号向后兼容低次版本号的接口。
+发布版本号，表示库的一些错误的修正，性能的改进，并不添加任何新的接口，也不对接口进行更正。相同主版本号，次版本号的共享库，不同的发布版本号之间完全兼容。
+
+
+SO-NAME:
+SO-NAME命名机制来记录共享库的依赖关系，每个共享库都有一个对应的SO-NAME，即共享库的文件名去掉次版本号和发布版本号。SO-NAME规定了共享库的接口。
+
+ldconfig会遍历所有默认共享库，然后更新所有软链接，使他们指向最新版本的共享库。
+
+链接名：
+ld在-static时，-lc会去找libc.a。使用-Bdynamic时，会找libc.so.x.y.z
+
+
+基于符号的版本机制：让每个导出和导入的符号都有一个相关联的版本号，类似名字修饰，VER_1.1 VER_1.2
+
+Linux下Glibc中C运行库GLIBC_2.0，GLIBC_2.6
+类似GCC_位前缀或GLIBC_PRIVATE这样的符号版本表示用于GCC编译器和GLIBC内部的。
+
+GCC提供了一种叫.symver的汇编宏指令来指定符号的版本。
+asm(".symver add, add@VERS_1.1");
+int add (int a, int b)
+{
+  return a + b;
+}
+这样符号add被指定为符号标签VERS_1.1
+
+GCC允许多个版本的同一个符号存在于一个共享库，在链接层面提供了某种形式的符号重载：
+asm(".symver old_printf, printf@VERS_1.1");
+asm(".symver new_printf, printf@VERS_1.2");
+int old_printf ()
+{
+}
+
+int new_printf ()
+{
+}
+
+链接器可以挑选某个符合的符号进行链接。
+
+Linux下的符号版本机制：
+在Linux下，使用ld --version-script，或gcc -Xlinker --version-script
+gcc -shared -fPIC lib.c -Xlinker --version-script lib.ver -o lib.so
+VERS_1.2 {
+global:
+foo;
+local:
+*;
+}
+gcc main.c ./lib.so -o main
+
+共享库系统路径：
+/lib
+/usr/lib
+/usr/local/lib
+/lib /usr/lib是一些很常用，成熟的，一般系统本身使用的库。
+/usr/local/lib是非系统所需的第三方程序的共享库
+
+
+共享库查找过程：
+DT_NEED类型指定了绝对路径，就从这个路径查找，如果是相对路径，动态链接器从/lib , /usr/lib和由/etc/ld.so.conf指定的目录查找库。
+ld.so.conf，ldconfig会将SO-NAME收集起来，存放在/etc/ld.so.cache文件，加快共享库的查找过程。
+
+
+环境变量：
+LD_LIBRARY_PATH：临时改变某个应用程序的共享库查找路径。
+或者直接运行动态链接器/lib/ld-linux.so.2 -library-path /home/usr
+顺序：
+变量LD_LIBRARY_PATH指定的路径，/etc/ld.so.cache指定的路径，默认共享库目录，/usr/lib, /lib
+会影响GCC编译时查找库的路径。
+
+LD_PRELOAD：指定预先加载的一些共享库，/etc/ld.so.preload
+
+LD_DEBUG,可以打开动态链接器的调试功能，
+LD_DEBUG=files ./a.out
+LD_DEBUG可以设置为如下值：
+bindings显示动态链接的符号绑定过程
+libs显示共享库的查找过程
+versions显示符号的版本依赖关系
+reloc显示重定位过程
+symbols显示符号表查找过程
+statistics显示动态链接过程的各种统计信息
+all显示以上所有信息
+help显示上面的各种选项的帮助信息。
 
 
 
-    </screen>
-</sect1>
-<sect1>
-    <title></title>
-    <screen>
-    </screen>
-</sect1>
-<sect1>
-    <title></title>
-    <screen>
-    </screen>
-</sect1>
-<sect1>
-    <title></title>
-    <screen>
-    </screen>
-</sect1>
-<sect1>
-    <title></title>
-    <screen>
+共享库的创建：
+gcc -shared -W1,-soname,my_soname -o library_name sourcefiles library_files
+-W1可以指定参数传递给链接器，-soname,my_soname指定输出共享库的SO-NAME。
+
+注意：
+不要将输出共享库的符号和调试信息去掉，不要使用GCC的-fomit-frame-pointer
+测试共享库，又不希望影响现有程序正常运行，LD_LIBRARY_PATH,或ld -rpath, gcc -W1,-rpath
+默认情况下，链接器在产生可执行文件时，只会将哪些链接时被其它共享模块引用到的符号放到动态符号表，当程序使用dlopen()动态加载某个共享模块，而该模块又反向引用主模块的符号，可能会导致失败。ld -export-dynamic表示将所有符号表导出到动态符号表。gcc -W1,-export-dynamic
+
+strip 清除符号信息。ld -s 消除所有符号信息， -S消除调试符号信息。
+
+安装共享库：ldconfig -n shared_library_directory
+
+共享库的构造和析构函数：
+void __attribute__((constructor(5))) init_function(void);
+void __attribute__((destructor(10))) fini_function(void);
+数字越小优先级越高,不可以使用gcc -nostartfiles或-nostdlib
+
+
+共享库脚本：
+通过链接脚本可以将几个现在的共享库通过一定方式组合产生新的库
+GROUP( /lib/libc.so.6 /lib/libm.so.2 )
     </screen>
 </sect1>
