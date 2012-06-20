@@ -1,0 +1,212 @@
+linux下在MIPS64体系中的系统调用流程的分析和处理,了解linux下系统调用的实现。
+
+<sect1>
+    <title>linux下异常初始化流程</title>
+    <screen>
+首先从内核C代码入口讲起，~/repos/build_all/fp_octeon_56xx/build/linux/init/main.c
+
+其中函数start_kernel完成了大部分的初始化工作。asmlinkage void __init start_kernel(void);它调用了trap_init来初始化系统的中断异常向量表。
+
+trap相关的主要处理是在~/repos/build_all/fp_octeon_56xx/build/linux/arch/mips/kernel/traps.c
+其中void __init trap_init(void);用来初始化向量表。
+
+首先通过Config3只读寄存器判断是否CPU有外部中断控制器，和向量表式的中断。其中CN56XX和CN68XX是没有外部中断控制器和向量表式的中断的。它的默认异常基地址在CKSEG0 - 0xFFFF FFFF 8000 0000。但是支持MIPSr2的CPU通过Ebase寄存器确定中断向量的基地,所以真正的ebase += (read_c0_ebase() &amp; 0x3ffff000)
+
+然后调用per_cpu_trap_init()来初始化每个CPU的trap：
+void __cpuinit per_cpu_trap_init(void);
+操作Status寄存器选择64位地址和32/32 FPR寄存器模型，重启BEV和TS，设置XX位，判断是否CPU有DSP。
+如果CPU支持MIPSr2，通过HWREna寄存器启用Cavium特定指令。
+因为CN56XX没有外部中断控制器和向量式中断，因此不需要修改Ebase寄存器和IntCtl寄存器来修改向量基地址，和启用新的向量空间。
+如果CPU支持MIPSr2，读取IntCtl.IPTI决定时钟中断号，和读取IntCtl.IPPCI决定性能计数器中断号。
+初始化asid_cache版本，创建TLB Miss的处理函数，初始化当前进程的active_mm。
+然后per_cpu_trap_init()返回。
+
+之后trap_init调用set_handler()开始安装中断向量代码。
+void __init set_handler(unsigned long offset, void *addr, unsigned long size);
+它首先使用memcpy将指定地址和大小的中断向量表复制到以ebase为基地址offset为偏移的内存区域。同时调用local_flush_icache_range，完成icache的flush。
+
+让我们来分析except_vec3_generic:
+最大只能放128字节：
+NESTED(except_vec3_generic, 0, sp)
+	.set	push
+	.set	noat
+#if R5432_CP0_INTERRUPT_WAR
+	mfc0	k0, CP0_INDEX
+#endif
+	mfc0	k1, CP0_CAUSE
+	andi	k1, k1, 0x7c
+#ifdef CONFIG_64BIT
+	dsll	k1, k1, 1
+#endif
+	PTR_L	k0, exception_handlers(k1)
+	jr	k0
+	.set	pop
+	END(except_vec3_generic)
+读取Cause寄存器，获取异常代号到k1,然后传递给expection_handlers[ExcCode]，并使用jr跳转执行。
+
+然后调用set_except_vector来设置缺省中断向量代码。
+总共有32个中断向量代码段。然后复制EJTAG debug的中断向量处理函数到最终位置。
+启用cache的奇偶校验。设置数据总线指令总线错误中断，然后设置其它中断向量。
+
+尤其8号中断是系统调用中断，使用set_except_vector(8, handle_sys)来安装．
+
+
+
+    </screen>
+</sect1>
+<sect1>
+    <title>syscall中断向量代码</title>
+    <screen>
+    .align  5
+NESTED(handle_sys64, PT_SIZE, sp)
+	/*
+	 * When 32-bit compatibility is configured scall_o32.S
+	 * already did this.
+	 */
+	.set	noat
+	SAVE_SOME
+	TRACE_IRQS_ON_RELOAD
+	STI
+	.set	at
+
+	dsubu	t0, v0, __NR_64_Linux	# check syscall number
+	sltiu	t0, t0,	__NR_64_Linux_syscalls + 1
+	ld	t1, PT_EPC(sp)		# skip syscall on return
+	daddiu	t1, 4			# skip to next instruction
+	sd	t1, PT_EPC(sp)
+	beqz	t0, illegal_syscall
+
+	dsll	t0, v0, 3		# offset into table
+	ld	t2, (sys_call_table - (__NR_64_Linux * 8))(t0)
+					# syscall routine
+
+	sd	a3, PT_R26(sp)		# save a3 for syscall restarting
+
+	li	t1, _TIF_SYSCALL_TRACE | _TIF_SYSCALL_AUDIT | _TIF_KERNEL_TRACE
+	LONG_L	t0, TI_FLAGS($28)	# syscall tracing enabled?
+	and	t0, t1, t0
+	bnez	t0, syscall_trace_entry
+
+	jalr	t2			# Do The Real Thing (TM)
+
+	li	t0, -EMAXERRNO - 1	# error?
+	sltu	t0, t0, v0
+	sd	t0, PT_R7(sp)		# set error flag
+	beqz	t0, 1f
+
+	dnegu	v0			# error
+	sd	v0, PT_R0(sp)		# set flag for syscall
+					# restarting
+1:	sd	v0, PT_R2(sp)		# result
+
+n64_syscall_exit:
+	local_irq_disable		# make sure need_resched and
+					# signals dont change between
+					# sampling and return
+	LONG_L	a2, TI_FLAGS($28)	# current->work
+	li	t0, _TIF_ALLWORK_MASK
+	and	t0, a2, t0
+	bnez	t0, n64_syscall_exit_work
+
+	j	restore_partial
+
+n64_syscall_exit_work:
+	j	syscall_exit_work_partial
+
+/* ------------------------------------------------------------------------ */
+
+syscall_trace_entry:
+	SAVE_STATIC
+	move	s0, t2
+	move	a0, sp
+	li	a1, 0
+	jal	do_syscall_trace
+
+	move	t0, s0
+	RESTORE_STATIC
+	ld	a0, PT_R4(sp)		# Restore argument registers
+	ld	a1, PT_R5(sp)
+	ld	a2, PT_R6(sp)
+	ld	a3, PT_R7(sp)
+	ld	a4, PT_R8(sp)
+	ld	a5, PT_R9(sp)
+	jalr	t0
+
+	li	t0, -EMAXERRNO - 1	# error?
+	sltu	t0, t0, v0
+	sd	t0, PT_R7(sp)		# set error flag
+	beqz	t0, 1f
+
+	dnegu	v0			# error
+	sd	v0, PT_R0(sp)		# set flag for syscall restarting
+1:	sd	v0, PT_R2(sp)		# result
+
+	j	syscall_exit
+
+illegal_syscall:
+	/* This also isn't a 64-bit syscall, throw an error.  */
+	li	v0, ENOSYS			# error
+	sd	v0, PT_R2(sp)
+	li	t0, 1				# set error flag
+	sd	t0, PT_R7(sp)
+	j	n64_syscall_exit
+	END(handle_sys64)
+    </screen>
+</sect1>
+<sect1>
+    <title></title>
+</sect1>
+<sect1>
+    <title></title>
+</sect1>
+<sect1>
+    <title></title>
+</sect1>
+<sect1>
+    <title></title>
+</sect1>
+<sect1>
+    <title></title>
+</sect1>
+<sect1>
+    <title></title>
+</sect1>
+<sect1>
+    <title></title>
+</sect1>
+<sect1>
+    <title></title>
+</sect1>
+<sect1>
+    <title></title>
+</sect1>
+<sect1>
+    <title></title>
+</sect1>
+<sect1>
+    <title></title>
+</sect1>
+<sect1>
+    <title></title>
+</sect1>
+<sect1>
+    <title></title>
+</sect1>
+<sect1>
+    <title></title>
+</sect1>
+<sect1>
+    <title></title>
+</sect1>
+<sect1>
+    <title></title>
+</sect1>
+<sect1>
+    <title></title>
+</sect1>
+<sect1>
+    <title></title>
+</sect1>
+<sect1>
+    <title></title>
+</sect1>

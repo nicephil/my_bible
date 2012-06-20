@@ -8,6 +8,8 @@ PUBLIC "-//OASIS//DTD DocBook XML V4.5/zh_cn" "http://www.oasis-open.org/docbook
 <!ENTITY static_link SYSTEM "static_link.xml">
 <!ENTITY load_process SYSTEM "load_process.xml">
 <!ENTITY dynamic_link SYSTEM "dynamic_link.xml">
+<!ENTITY syscall_process SYSTEM "syscall_process.xml">
+
 ]>
 <book>
     <info>
@@ -52,7 +54,8 @@ PUBLIC "-//OASIS//DTD DocBook XML V4.5/zh_cn" "http://www.oasis-open.org/docbook
     </chapter>
 
     <chapter>  
-        <title>History</title>
+        <title>syscall流程</title>
+        &syscall_process;
     </chapter>
 
     <chapter>  
