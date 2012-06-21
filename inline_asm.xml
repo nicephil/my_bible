@@ -479,4 +479,51 @@ GCC 支持在C/C++代码中嵌入汇编代码，这些汇编代码被称作GCC I
 
  约束 Input/Output 意义 
  m I,O 表示使用系统所支持的任何一种内存方式，不需要借助寄存器
+
+ MIPS相关约束：
+ MIPS—config/mips/constraints.md
+ d
+ An address register. This is equivalent to r unless generating MIPS16 code. 
+地址寄存器，除非产生MIPS16代码时，它等同于r
+ f
+ A floating-point register (if available). 
+ 如果可用指浮点寄存器
+ h
+ Formerly the hi register. This constraint is no longer supported. 
+以前指hi寄存器，这个限制不再支持
+ l
+ The lo register. Use this register to store values that are no bigger than a word. 
+ 指lo寄存器。使用这个寄存器保存不大于一个字的数值
+ x
+ The concatenated hi and lo registers. Use this register to store doubleword values. 
+ hi和lo寄存器，使用这个寄存器保存双字数值
+ c
+ A register suitable for use in an indirect jump. This will always be $25 for -mabicalls. 
+ 使用在间接跳转。通常是$25
+ v
+ Register $3. Do not use this constraint in new code; it is retained only for compatibility with glibc. 
+ y
+ Equivalent to r; retained for backwards compatibility. 
+ z
+ A floating-point condition code register. 
+ I
+ A signed 16-bit constant (for arithmetic instructions). 
+ J
+ Integer zero. 
+ K
+ An unsigned 16-bit constant (for logic instructions). 
+ L
+ A signed 32-bit constant in which the lower 16 bits are zero. Such constants can be loaded using lui. 
+ M
+ A constant that cannot be loaded using lui, addiu or ori. 
+ N
+ A constant in the range −65535 to −1 (inclusive). 
+ O
+ A signed 15-bit constant. 
+ P
+ A constant in the range 1 to 65535 (inclusive). 
+ G
+ Floating-point zero. 
+ R
+ An address that can be used in a non-macro load or store.
  </screen>
