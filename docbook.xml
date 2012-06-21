@@ -9,7 +9,7 @@ PUBLIC "-//OASIS//DTD DocBook XML V4.5/zh_cn" "http://www.oasis-open.org/docbook
 <!ENTITY load_process SYSTEM "load_process.xml">
 <!ENTITY dynamic_link SYSTEM "dynamic_link.xml">
 <!ENTITY syscall_process SYSTEM "syscall_process.xml">
-
+<!ENTITY inline_asm SYSTEM "inline_asm.xml">
 ]>
 <book>
     <info>
@@ -59,7 +59,8 @@ PUBLIC "-//OASIS//DTD DocBook XML V4.5/zh_cn" "http://www.oasis-open.org/docbook
     </chapter>
 
     <chapter>  
-        <title>History</title>
+        <title>GCC的内联汇编</title>
+        &inline_asm;
     </chapter>
 
     <chapter>  
