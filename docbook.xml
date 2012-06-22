@@ -10,6 +10,7 @@ PUBLIC "-//OASIS//DTD DocBook XML V4.5/zh_cn" "http://www.oasis-open.org/docbook
 <!ENTITY dynamic_link SYSTEM "dynamic_link.xml">
 <!ENTITY syscall_process SYSTEM "syscall_process.xml">
 <!ENTITY inline_asm SYSTEM "inline_asm.xml">
+<!ENTITY inject_process SYSTEM "inject_process.xml">
 ]>
 <book>
     <info>
@@ -64,7 +65,8 @@ PUBLIC "-//OASIS//DTD DocBook XML V4.5/zh_cn" "http://www.oasis-open.org/docbook
     </chapter>
 
     <chapter>  
-        <title>History</title>
+        <title>PTRACE注入进程</title>
+        &inject_process;
     </chapter>
 
     <chapter>  

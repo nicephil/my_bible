@@ -1,0 +1,247 @@
+<sect1>
+    <title>进程注入</title>
+    <screen>
+这里我们探讨下如何修改正在运行的进程。我们可能需要如下操作运行时进程。
+1) 内存申请：能够通过另外的进程申请和释放一个运行中的进程的内存
+2) 内存管理：复制一个进程的任意的内存到另外一个进程的任意地址
+3) 库的注入：注入任意的共享对象到一个运行中的进程允许获取符号
+4) 代码注入：想执行在一个给定进程的自己定义的代码并控制执行
+a。Forking：创建一个子进程并执行任意代码
+b。Threading：创建一个线程并执行任意函数
+c。Function Trampolines：一个给定函数的调用跳转到任意代码，并跳回到正常函数
+    </screen>
+</sect1>
+<sect1>
+    <title>相关技术</title>
+    <screen>
+1) ptrace：进程跟踪的API，允许另一个进程控制运行的进程并修改内存，读取内存，查看和设置寄存器，和单步执行
+一个运行的进程
+2) /proc/[pid]/mem：这个技术限制很多，但是不应该丢弃。
+    </screen>
+</sect1>
+<sect1>
+    <title>执行转移</title>
+    <screen>
+转移正在运行的进程执行到我们控制的代码。首先是如何放置我们想执行的代码?
+那么需要了解进程的布局和执行流。最基本的工具是符号表，符号映射到vma。
+objdump --syms ./example | grep main
+08048450 g F .text 00000082 main
+main函数是最好的倾倒区域给任意代码，因为它的代码永远不会再次运行。当然还
+有很多区域当作倾倒区域，例如如果程序有帮助函数区域，一般不会使用
+
+然后是如何修改执行过程？这里需要知道ptrace的知识和vm如何遍历可执行文件。
+在X86平台，有个vm寄存器用来保存下个指令的vma。一旦一个指令完成，vm处理在
+eip（vm寄存器）的指令，并将eip加上当前指令长度。有些其它跳转指令，比如jmp
+引起eip被修改到操作数指定的地址。理论上我们放置一些自己的代码在0x08048450，
+为了执行我们的代码，通过ptrace的PTRACE_SETREGS和PTRACE_GETREGS函数，他们
+允许第三方程序获取和设置另外一个进程的寄存器。这个寄存器包含eip。步骤如下：
+a。调用PTRACE_GETREGS获取当前的寄存器信息
+b。设置其中的eip为我们代码的地址
+c。调用PTRACE_SETREGS来设置寄存器
+d。继续执行原进程
+
+然后一旦我们的代码执行完毕如何恢复原来的执行？我们需要修改我们的注入代码
+可以在最后加入int 0x3，在Linux下引起异常或断点SIGTRAP来激活调试器。如果进程
+正在被跟踪，那么它将被wait()捕获。
+nop
+nop
+nop
+nop
+nop
+nop
+
+move $0x1, %eax
+int $0x3
+nop
+步骤多了些：
+a。调用PTRACE_GETREGS
+b。保存这些寄存器，用于恢复
+c。设置eip寄存器到注入代码的地址
+d。调用PTRACE_SETREGS修改寄存器
+e。继续执行，但是使用wait()函数监视信号，如果wait函数返回信号
+aa。调用PTRACE_GETREGS
+bb。如果eip减去保存的eip等于注入代码大小-1.表示注入代码执行到最后
+那么到下一步f
+cc。否则，继续执行
+f。在注入代码完成后，调用PTRACE_SETREGS恢复步骤b保存的值。
+    </screen>
+</sect1>
+<sect1>
+    <title>内存分配</title>
+    <screen>
+首先弄明白malloc在给定进程的哪里，以至于我们可以调用它。
+1) ldd ./example
+libc.so.6 => /lib/libc.so.6 (0x40016000)
+/lib/ld-linux.so.2 => /lib/ld-linux.so.2 (0x40000000)
+objdump --dynamic-syms --section=.text \
+/lib/libc.so.6 | grep malloc
+0006df90 w DF .text 00000235 GLIBC_2.0 malloc 
+objdump --dynamic-syms --section=.text \
+/lib/ld-linux.so.2 | grep malloc
+0000c8f0 w DF .text 000000bd GLIBC_2.0 malloc
+ld-linux是解释器，每个用到共享库的程序都需要用到
+2) 现在我们知道malloc的vma在0x0000c8f0，这个只是在ld-linux.so.2
+里的偏移，ld-linux基地址在0x40000000，那么真实的vma是0x4000c8f0。
+3) 这样我们通过执行转移来调用malloc申请内存，通过PTRACE_GETREGS获取
+寄存器，其中eax保存了函数返回值。
+nop
+nop
+nop
+nop
+nop
+nop
+
+push %ebx # 申请的大小
+call *%eax # 调用malloc
+add $x4, %esp # 恢复栈
+int $0x3 # 断点
+nop
+
+4) 现在执行这个代码，然后恢复进程到正常运行，内存被申请了。
+    </screen>
+</sect1>
+<sect1>
+    <title>内存管理</title>
+    <screen>
+复制内存从一个进程到另外一个进程可使用PTRACE_POKEDATA,它允许写
+4字节数据到一个进程的给定地址。
+    </screen>
+</sect1>
+<sect1>
+    <title>共享库注入</title>
+    <screen>
+首先弄清楚如何加载一个共享库?libdl提供了dlopen(),dlsymb(),dlclose().
+objdump --dynamic-syms /lib/libc.so.6 | \
+grep _dl_ | egrep "open|close|sym"
+000f7d10 g DF .text 000001ad GLIBC_2.2 _dl_vsym
+000f6f10 g DF .text 000006b8 GLIBC_2.0 _dl_close
+000f6d80 g DF .text 00000190 GLIBC_2.0 _dl_open
+000f7c00 g DF .text 0000010d GLIBC_2.2 _dl_sym
+可以看到共享库lib.so.6有_dl_open, _dl_sym,和_dl_close。
+来看看他们的原型
+extern void *dlopen (const char *file, int mode);
+extern void *dlsym (void *handle, const char *name)
+extern int dlclose (void *handle)
+而这些是
+void *_dl_open (const char *file, int mode, const void *caller)
+void *_dl_sym (void *handle, const char *name, void *who)
+void _dl_close (void *_map)
+        000f6d80 &lt;.text+0xdde00&gt; (_dl_open):
+           f6d80:       55                      push   %ebp
+           f6d81:       89 e5                   mov    %esp,%ebp
+           f6d83:       83 ec 2c                sub    $0x2c,%esp
+           f6d86:       57                      push   %edi
+           f6d87:       56                      push   %esi
+           f6d88:       53                      push   %ebx
+           f6d89:       e8 00 00 00 00          call   0xf6d8e
+           f6d8e:       5b                      pop    %ebx
+           f6d8f:       81 c3 ba 10 02 00       add    $0x210ba,%ebx
+           f6d95:       89 c7                   mov    %eax,%edi
+           f6d97:       89 d6                   mov    %edx,%esi
+           f6d99:       89 4d e4                mov    %ecx,0xffffffe4(%ebp)
+           f6d9c:       f7 c6 03 00 00 00       test   $0x3,%esi
+           f6da2:       75 1c                   jne    0xf6dc0
+           f6da4:       83 c4 f4                add    $0xfffffff4,%esp
+
+      void *
+      internal_function
+      _dl_open (const char *file, int mode, const void *caller)
+      {
+           struct dl_open_args args;
+           const char *objname;
+           const char *errstring;
+           int errcode;
+         
+           if ((mode &amp; RTLD_BINDING_MASK) == 0)
+                /* One of the flags must be set.  */
+                _dl_signal_error (EINVAL, file, NULL, 
+                  N_("invalid mode for dlopen()"));
+
+         ....
+
+      }
+
+      其中eax = library name共享库名 (例如: /lib/libc.so.6)
+      ecx = caller调用者 (例如: ./example)
+      edx = mode模式 (例如：RTLD_NOW | 0x80000000)
+
+那么我们可以写下如下代码：
+nop
+nop
+nop
+nop
+nop
+nop
+
+call *%edi # 调用_dl_open
+int $0x3 # 断点
+nop
+
+其它的期望参数是:
+_dl_sym:
+eax = library handle被_dl_open打开的库句柄
+edx = symbol name符号名(例如：pthread_create)
+
+_dl_close:
+eax = library hanlde被_dl_open打开的库句柄
+    </screen>
+</sect1>
+<sect1>
+    <title>代码注入</title>
+    <screen>
+如果想在另外的进程上下文内创建子进程
+nop
+nop
+nop
+nop
+nop
+nop
+
+mov $0x2, %eax # fork系统调用
+int $0x80 # 系统调用中断
+cmp $0x00, %eax # 是否返回值是0
+
+jne fork_finished # 因为eax不是零，表明是父进程
+
+push %ebx # 如果eax是零，子进程开始，将开始地址
+
+call *%edi # 调用函数 
+mov $0x1, %eax # 系统调用exit
+int $0x80 # 退出子进程
+fork_finished:
+int $0x3
+nop
+代码期望寄存器值:
+ebx = 传入函数的参数
+edi = 子进程上下文中被调用函数的虚拟地址
+
+
+如果想在另外进程里创建线程：
+首先注入libpthread.so到进程中
+寻找pthread_create的虚拟地址
+申请和复制用户定义代码
+执行转移到桩代码来创建线程
+nop
+nop
+nop
+nop
+nop
+nop
+
+sub $0x4, %esp # 空间id
+mov %esp, %ebp # 保存esp到ebp压栈
+push %ebx # 参数压栈
+push %eax # 函数压栈
+push $0x0 # 没有属性
+push %ebp # 压栈保存进程id的地址
+call *%edi # 调用pthread_create
+add $0x14, %esp # 恢复栈
+int $0x3 # 断点
+nop
+
+函数跳转：
+
+
+
+    </screen>
+</sect1>
