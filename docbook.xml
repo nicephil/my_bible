@@ -60,7 +60,7 @@ PUBLIC "-//OASIS//DTD DocBook XML V4.5/zh_cn" "http://www.oasis-open.org/docbook
     </chapter>
 
     <chapter>  
-        <title>GCC的内联汇编</title>
+        <title>GCC的C语言中内联汇编</title>
         &inline_asm;
     </chapter>
 
@@ -70,7 +70,7 @@ PUBLIC "-//OASIS//DTD DocBook XML V4.5/zh_cn" "http://www.oasis-open.org/docbook
     </chapter>
 
     <chapter>  
-        <title>History</title>
+        <title>GCC支持的C内联ASM</title>
     </chapter>
 
     <chapter>  

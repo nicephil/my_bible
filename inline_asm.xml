@@ -527,3 +527,33 @@ GCC 支持在C/C++代码中嵌入汇编代码，这些汇编代码被称作GCC I
  R
  An address that can be used in a non-macro load or store.
  </screen>
+
+ <screen>
+asm ("fsinx %1,%0" : "=f" (result) : "f" (angle));
+其中angle是C表达式作为输入操作数，result是输出操作数，每个"f"最为操作数约束条件，说明一个浮点寄存器需要。"=f"中的"="表示这个操作数是输出，所有输出操作数必须使用"="。
+
+GCC支持符号名字在汇编代码中引用。
+asm ("fsinx %[angle],%[output]" : [output] "=f" (result) : [angle] "f" (angle));
+符号名字跟其它C标识符没有任何关系，你可以使用任意字符，甚至C中存在的符号。
+输出操作数必须是lvalues，编译器可以检查，但是输入操作数不必是lvalues。如果输出表达式不能直接定位（例如bit域），约束条件必须是寄存器，GCC将使用寄存器作为汇编的结果，并存寄存器到输出。
+扩展汇编支持输入输出操作数或读-写操作数。使用"+"表示这种操作数。
+
+asm("combine %2, %0" : "=r" (foo) : "0" (foo), "g" (bar));
+约束"0"对于操作数1表示它必须占用和操作数0一样的位置。约束条件里的数字只能用在输入操作数，并且它必须引用一个输出操作数。
+asm("combine %2,%0" : "=r" (foo) " : "r" (foo), "g" (bar));不能保证输入操作数foo和输出操作数foo在同一个位置，一些优化或重新加载将引起操作数0和操作数1在不同寄存器里。
+
+GCC中也允许使用[name]代替操作数数字
+asm("cmoveq %1,%2,%[result]" : [result] "=r" (result) : "r" (test), "r" (new), "[result]"(old));
+asm("cmoveq %1,%2,%0" : "=r" (result) : "r" (test), "r" (new), "0"(old));
+
+指定特定寄存器
+int t1 = ...;
+register int *p1 asm ("r0") = ...;
+register int *p2 asm ("r1") = t1;
+register int *result asm ("r0");
+asm ("sysint" : "=r" (result) : "0" (p1), "r" (p2));
+
+volatile 在asm前面避免GCC删除asm声明
+
+
+ </screen>
