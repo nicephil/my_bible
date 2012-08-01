@@ -1,3 +1,5 @@
+<sect1>
+    <title>GCC内联汇编</title>
 <screen>
 GCC 支持在C/C++代码中嵌入汇编代码，这些汇编代码被称作GCC Inline ASM——GCC内联汇编。这是一个非常有用的功能，有利于我们将一些C/C++语法无法表达的指令直接潜入C/C++代码中，另外也允许我们直接写 C/C++代码中使用汇编编写简洁高效的代码。
 
@@ -557,3 +559,41 @@ volatile 在asm前面避免GCC删除asm声明
 
 
  </screen>
+ </sect1>
+ <sect1>
+     <title>GCC优化问题</title>
+<screen>
+为了让一个页变成脏页（页表中dirty位被置上），需要执行下面这段代码：
+
+1 uint32_t *page; 
+
+2 // ... 
+
+3 page[0] = page[0]; 
+
+最后一行代码很有可能被gcc优化掉，因为这段代码看起来没有任何实际的作用。那么如何防止gcc对这段代码做优化呢？
+
+设置gcc编译时优化级别为-O0肯定是不合适的，这样对程序性能影响会比较大。
+一个强制类型转换的方案：
+
+1 ((unsigned char volatile *)page)[0] = page[0]; 
+
+通过volatile关键字禁止gcc的优化，和我之前采用的方法类似。
+
+另外可以使用编译器指令#pragma指定那块代码的特殊处理
+1 #pragma GCC push_options 
+
+2 #pragma GCC optimize ("O0") 
+
+3   
+
+4 your code 
+
+5   
+
+6 #pragma GCC pop_options 
+
+这里用到了gcc 4.4的特性Function Specific Option Pragmas，在特定代码前保存当前的编译选项，然后对特定的代码使用O0优化级别，最后再恢复之前保存的编译选项。
+
+</screen>
+ </sect1>

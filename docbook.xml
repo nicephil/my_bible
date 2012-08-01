@@ -9,7 +9,7 @@ PUBLIC "-//OASIS//DTD DocBook XML V4.5/zh_cn" "http://www.oasis-open.org/docbook
 <!ENTITY load_process SYSTEM "load_process.xml">
 <!ENTITY dynamic_link SYSTEM "dynamic_link.xml">
 <!ENTITY syscall_process SYSTEM "syscall_process.xml">
-<!ENTITY inline_asm SYSTEM "inline_asm.xml">
+<!ENTITY gcc SYSTEM "gcc.xml">
 <!ENTITY inject_process SYSTEM "inject_process.xml">
 ]>
 <book>
@@ -60,8 +60,8 @@ PUBLIC "-//OASIS//DTD DocBook XML V4.5/zh_cn" "http://www.oasis-open.org/docbook
     </chapter>
 
     <chapter>  
-        <title>GCC的C语言中内联汇编</title>
-        &inline_asm;
+        <title>GCC问题</title>
+        &gcc;
     </chapter>
 
     <chapter>  
@@ -70,7 +70,7 @@ PUBLIC "-//OASIS//DTD DocBook XML V4.5/zh_cn" "http://www.oasis-open.org/docbook
     </chapter>
 
     <chapter>  
-        <title>GCC支持的C内联ASM</title>
+        <title>History</title>
     </chapter>
 
     <chapter>  
