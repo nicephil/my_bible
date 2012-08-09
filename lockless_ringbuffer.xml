@@ -26,8 +26,8 @@ Overwrite模式是生产者在消费者读取内容前填充缓冲区，否则�
 这是非常重要的算法。写者像一个“栈”，中断工作的方式增强了这种行为。
 
 writer1 start
-  <preempted> writer2 start
-      <preempted> writer3 start
+  &lt;preempted&gt; writer2 start
+      &lt;preempted&gt; writer3 start
           writer3 finishes
     writer2 finishes
 writer1 finishes

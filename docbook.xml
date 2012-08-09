@@ -13,6 +13,7 @@ PUBLIC "-//OASIS//DTD DocBook XML V4.5/zh_cn" "http://www.oasis-open.org/docbook
 <!ENTITY inject_process SYSTEM "inject_process.xml">
 <!ENTITY dwarf SYSTEM "dwarf.xml">
 <!ENTITY qemu SYSTEM "qemu.xml">
+<!ENTITY lockless SYSTEM "lockless_ringbuffer.xml">
 ]>
 <book>
     <info>
@@ -185,7 +186,8 @@ email	电子邮件	&lt;电子邮件&gt;
     </chapter>
 
     <chapter>  
-        <title>History</title>
+        <title>lockfree相关</title>
+        &lockless;
     </chapter>
 
     <chapter>  
