@@ -6,7 +6,32 @@
         我们来实际看看到底有什么东东。
         
     </para>
-    <para>
+<screen>
+        例子程序：
+            #include &lt;stdio.h&gt;
+
+struct my_s {
+    int a;
+    char c;
+};
+struct my_s myidea = {0};
+void do_stuff(int my_arg)
+{
+   int i;
+   int my_local = my_arg + 2;
+
+    for (i = 0; i &lt; my_local; ++i)
+        printf("i = %d\n", i);
+}
+
+int main()
+{
+    do_stuff(2);
+    return 0;
+}
+
+gcc -g dd.c -o dd
+readelf -a dd, 可以看到多出了一些调试段，
   [27] .debug_aranges    PROGBITS         0000000000000000  00000968
        0000000000000030  0000000000000000           0     0     1
   [28] .debug_info       PROGBITS         0000000000000000  00000998
@@ -19,12 +44,99 @@
        00000000000000a5  0000000000000001  MS       0     0     1
   [32] .debug_loc        PROGBITS         0000000000000000  00000bf5
        00000000000000c0  0000000000000000           0     0     1
-    </para>
+    objdump -Wi dd 
+ &lt;1&gt;&lt;72&gt;: Abbrev Number: 4 (DW_TAG_structure_type)
+    &lt;73&gt;   DW_AT_name        : (indirect string, offset: 0x7c): my_s    
+    &lt;77&gt;   DW_AT_byte_size   : 8        
+    &lt;78&gt;   DW_AT_decl_file   : 1        
+    &lt;79&gt;   DW_AT_decl_line   : 3        
+    &lt;7a&gt;   DW_AT_sibling     : &lt;0x97&gt;   
+ &lt;2&gt;&lt;7e&gt;: Abbrev Number: 5 (DW_TAG_member)
+    &lt;7f&gt;   DW_AT_name        : a        
+    &lt;81&gt;   DW_AT_decl_file   : 1        
+    &lt;82&gt;   DW_AT_decl_line   : 4        
+    &lt;83&gt;   DW_AT_type        : &lt;0x4f&gt;   
+    &lt;87&gt;   DW_AT_data_member_location: 2 byte block: 23 0       (DW_OP_plus_uconst: 0)
+ &lt;2&gt;&lt;8a&gt;: Abbrev Number: 5 (DW_TAG_member)
+    &lt;8b&gt;   DW_AT_name        : c        
+    &lt;8d&gt;   DW_AT_decl_file   : 1        
+    &lt;8e&gt;   DW_AT_decl_line   : 5        
+    &lt;8f&gt;   DW_AT_type        : &lt;0x6b&gt;   
+    &lt;93&gt;   DW_AT_data_member_location: 2 byte block: 23 4       (DW_OP_plus_uconst: 4)
+ &lt;1&gt;&lt;97&gt;: Abbrev Number: 6 (DW_TAG_subprogram)
+    &lt;98&gt;   DW_AT_external    : 1        
+    &lt;99&gt;   DW_AT_name        : (indirect string, offset: 0x4d): do_stuff        
+    &lt;9d&gt;   DW_AT_decl_file   : 1        
+    &lt;9e&gt;   DW_AT_decl_line   : 8        
+    &lt;9f&gt;   DW_AT_prototyped  : 1        
+    &lt;a0&gt;   DW_AT_low_pc      : 0x1000043c       
+    &lt;a4&gt;   DW_AT_high_pc     : 0x100004bc       
+    &lt;a8&gt;   DW_AT_frame_base  : 0x0      (location list)
+    &lt;ac&gt;   DW_AT_sibling     : &lt;0xd9&gt;   
+ &lt;2&gt;&lt;b0&gt;: Abbrev Number: 7 (DW_TAG_formal_parameter)
+    &lt;b1&gt;   DW_AT_name        : (indirect string, offset: 0x75): my_arg  
+    &lt;b5&gt;   DW_AT_decl_file   : 1        
+    &lt;b6&gt;   DW_AT_decl_line   : 8        
+    &lt;b7&gt;   DW_AT_type        : &lt;0x4f&gt;   
+    &lt;bb&gt;   DW_AT_location    : 2 byte block: 91 68      (DW_OP_fbreg: -24)
+ &lt;2&gt;&lt;be&gt;: Abbrev Number: 8 (DW_TAG_variable)
+    &lt;bf&gt;   DW_AT_name        : i        
+    &lt;c1&gt;   DW_AT_decl_file   : 1        
+    &lt;c2&gt;   DW_AT_decl_line   : 10       
+    &lt;c3&gt;   DW_AT_type        : &lt;0xd9&gt;   
+    &lt;c7&gt;   DW_AT_location    : 2 byte block: 91 58      (DW_OP_fbreg: -40)
+ &lt;2&gt;&lt;ca&gt;: Abbrev Number: 9 (DW_TAG_variable)
+    &lt;cb&gt;   DW_AT_name        : (indirect string, offset: 0x21): my_local        
+    &lt;cf&gt;   DW_AT_decl_file   : 1        
+    &lt;d0&gt;   DW_AT_decl_line   : 11       
+    &lt;d1&gt;   DW_AT_type        : &lt;0xd9&gt;   
+    &lt;d5&gt;   DW_AT_location    : 2 byte block: 91 5c      (DW_OP_fbreg: -36)
+ &lt;1&gt;&lt;d9&gt;: Abbrev Number: 10 (DW_TAG_volatile_type)
+    &lt;da&gt;   DW_AT_type        : &lt;0x4f&gt;   
+ &lt;1&gt;&lt;de&gt;: Abbrev Number: 11 (DW_TAG_subprogram)
+    &lt;df&gt;   DW_AT_external    : 1        
+    &lt;e0&gt;   DW_AT_name        : (indirect string, offset: 0x69): main    
+    &lt;e4&gt;   DW_AT_decl_file   : 1        
+    &lt;e5&gt;   DW_AT_decl_line   : 17       
+    &lt;e6&gt;   DW_AT_type        : &lt;0x4f&gt;   
+    &lt;ea&gt;   DW_AT_low_pc      : 0x100004bc       
+    &lt;ee&gt;   DW_AT_high_pc     : 0x100004f8       
+    &lt;f2&gt;   DW_AT_frame_base  : 0x44     (location list)
+ &lt;1&gt;&lt;f6&gt;: Abbrev Number: 12 (DW_TAG_variable)
+    &lt;f7&gt;   DW_AT_name        : (indirect string, offset: 0x6e): myidea  
+    &lt;fb&gt;   DW_AT_decl_file   : 1        
+    &lt;fc&gt;   DW_AT_decl_line   : 7        
+    &lt;fd&gt;   DW_AT_type        : &lt;0x72&gt;   
+    &lt;101&gt;   DW_AT_external    : 1       
+    &lt;102&gt;   DW_AT_location    : 5 byte block: 3 10 1 8 44       (DW_OP_addr: 10010844)
+
+Debugging Information Entry (DIE).每个DIE有自己的标签 –- 它的类型, 一系列的属性.DIEs通过兄弟和儿子互联,属性值可以指向其他的DIE.
+</screen>
+
 </sect1>
 <sect1>
-    <title></title>
-    <para>
-    </para>
+    <title>查找函数</title>
+<screen>
+拿do_stuff函数来说:
+函数对应的TAG名是DW_TAG_subprogram, 
+DW_AT_external表示函数是个全局的，局部函数没有找个属性
+DW_AT_name表示函数名字是do_stuff
+DWAT_AT_TYPE指定了函数的返回值类型，void没有返回值的函数没有找个属性
+DW_AT_low_pc指定了函数代码的起始地址, 0x1000043c
+DW_AT_high_pc表示函数代码的结束地址, 0x100004bc
+DW_AT_frame_base指定了函数帧位置，0x0 location list表示需要到.debug_loc里根据偏移0x0查找
+Contents of the .debug_loc section:
+
+    Offset   Begin    End      Expression
+    00000000 1000043c 10000440 (DW_OP_breg1: 0)
+    00000000 10000440 10000450 (DW_OP_breg1: 48)
+    00000000 10000450 100004b4 (DW_OP_breg31: 48)
+    00000000 100004b4 100004b8 (DW_OP_breg11: 0)
+    00000000 100004b8 100004bc (DW_OP_breg1: 0)
+    00000000 <End of list>
+表示
+
+</screen>
 </sect1>
 <sect1>
     <title></title>
