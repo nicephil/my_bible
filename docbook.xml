@@ -12,6 +12,7 @@ PUBLIC "-//OASIS//DTD DocBook XML V4.5/zh_cn" "http://www.oasis-open.org/docbook
 <!ENTITY gcc SYSTEM "gcc.xml">
 <!ENTITY inject_process SYSTEM "inject_process.xml">
 <!ENTITY dwarf SYSTEM "dwarf.xml">
+<!ENTITY qemu SYSTEM "qemu.xml">
 ]>
 <book>
     <info>
@@ -76,7 +77,8 @@ PUBLIC "-//OASIS//DTD DocBook XML V4.5/zh_cn" "http://www.oasis-open.org/docbook
     </chapter>
 
     <chapter>  
-        <title>History</title>
+        <title>qemu和lttng</title>
+        &qemu;
     </chapter>
 
     <chapter>  

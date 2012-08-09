@@ -1,0 +1,227 @@
+<sect1>
+    <title>qemu中mini2440硬件仿真环境</title>
+    <para>
+    </para>
+<screen>
+1. 下载qemu for mini2440
+git clone git://repo.or.cz/qemu/mini2440.git  qemu
+$ ./configure --target-list=arm-softmmu
+$ make -j4
+$ make install
+其中qemu/mini2440中有运行仿真环境的脚本mini2440_start.sh后面需要相应修改
+注意这里有时会出现浮点操作异常退出，原因是qemu/sdl.c里的sdl_send_mouse_event()
+函数没有判断当前width和height所致，这边有个补丁：
+添加if (width == 1 &amp;&amp; height == 1) return;在函数开始位置
+
+2. 交叉工具链
+可以使用buildroot, crosstools自己构建，也可以从codesourcy下载，
+或者直接使用天嵌mini2440的4.3.3版本的工具链：
+http://soft.embedsky.net/files/linux_src/EABI-4.3.3_EmbedSky_20091210.rar
+解压缩并将4.3.3/bin加入到PATH中
+
+3. 下载u-boot for mini2440
+git clone  git://repo.or.cz/w/u-boot-openmoko/mini2440.git  uboot
+如果想在之后使用u-boot 的nfs下载文件功能，需要修改代码中的一部分，将net/nfs.c文件中的
+NFS_TIMEOUT = 2UL 修改为 NFS_TIMEOUT = 20000UL 否则会造成nfs文件下载失败，如果不使用nfs下载功能，不改也可。
+$ ARCH=arm CROSS_COMPILE=arm-linux- make mini2440_config
+$ ARCH=arm CROSS_COMPILE=arm-linux- make -j4
+最终生成u-boot.bin复制到qemu/mini2440目录下和mini2440_start.sh同一目录下
+
+4. 下载 linux kernel for mini2440
+git clone git://repo.or.cz/linux-2.6/mini2440.git linux-2.6
+进入源码目录
+$ ARCH=arm CROSS_COMPILE=arm-linux- make mini2440_defconfig
+$ ARCH=arm CROSS_COMPILE=arm-linux- make -j4 uImage
+$ ARCH=arm CROSS_COMPILE=arm-linux- make -j4 modules
+因为制作uImage需要使用uboot/tools下的工具，需要将uboot/tools放入PATH环境
+变量里
+复制生成的*.ko文件到root_qtopia/lib里面
+
+之后会在arch/arm/boot/目录下生成uImage 文件，将此文件复制到qemu/mini2440文件夹下，并将mini2440文件夹中的mini2440_start.sh作如下修改
+将 kernel 一行改为-kernel "$base/uImage"
+
+5. 制作rootfs
+可以使用buildroot自己构建，也可使用天嵌的qtopia的rootfs：
+http://soft.embedsky.net/files/qt_src/root_qtopia_2.2.0_2.6.30.4_20100601.rar
+解压缩后面作为rootfs根目录通过NFS使用
+注意root_qtopia/etc/init.d/rcS里对网卡进行了重新配置造成断网，
+因此需要注释掉rcS里的自加载模块，和对网卡的配置。
+
+6. 安装 nfs服务器
+参看:https://wiki.archlinux.org/index.php/NFSv4
+$ yaourt -S nfs-utils
+
+之后修改/etc/exports文件，添加如下一行
+/home/user/nfs    *(rw,fsid=0,no_subtree_check,async,no_root_squash,nohide)
+....................注意  /home/user/nfs 为你所要共享的目录
+启动nfs server服务
+$ sudo rc.d start rpcbind nfs-common nfs-server
+可将其加入/etc/rc.conf自动启动
+
+7. 安装bridge-utils和uml_utilities
+想要使用qemu的网路必须安装这两个
+$ yaourt -S bridge-utils uml_utilities
+$ sudo modprobe bridge
+$ sudo modprobe tun
+可将其加入/etc/rc.conf自动加载
+
+
+8. 将qemu/mini2440目录下的mini2440_start.sh修改为
+#!/bin/sh 
+cmd="qemu-system-arm \
+    -kernel ./uImage
+    -M mini2440 $* \
+    -serial stdio \
+    -show-cursor \
+    -usb -usbdevice keyboard -usbdevice mouse \
+    -net nic,vlan=0 -net tap,vlan=0,ifname=tap0,script=./qemu-ifup,downscript=./qemu-ifdown \
+    -monitor telnet::5555,server,nowait"
+
+
+echo $cmd
+echo ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+sudo $cmd
+
+在建立两个脚本,分别为qemu-ifup, qemu-ifdown
+qemu-ifup 脚本
+#!/bin/sh 
+echo "Excuting qemu-ifup"
+ifconfig $1 10.0.0.1
+
+qemu-ifdown脚本
+#!/bin/sh 
+echo "Close tap!"
+sudo ifconfig $1 10.0.0.1 down
+
+9. 当这些都配置好后，我们即可使用nfs根文件系统了
+
+这里我们的根文件系统为 /home/username/nfs
+
+在qemu/mini2440的目录中输入
+$ ./mini2440_start.sh
+
+u-boot启动成功后输入设置linux kernel的引导参数
+set bootargs noinitrd root=/dev/nfs rw nfsroot=10.0.0.1:/home/user/nfs/root_qtopia ip=10.0.0.10:10.0.0.1::255.255.255.0 console=ttySAC0,115200
+再输入命令
+bootm
+
+OK ！ kernel就开始加载了，文件系统挂在成功后，就可以进行各种仿真工作了
+</screen>
+</sect1>
+<sect1>
+    <title>在qemu-mini2440里使用lttng</title>
+    <para>
+    </para>
+<screen>
+1. 下载lttng工具链相应版本
+我们使用的linux本版是linux-2.6.32-rc8,参考LTTng+LTTV versions compatibility
+表：http://lttng.org/cgi-bin/gitweb.cgi?p=lttv.git;a=blob_plain;f=doc/developer/lttng-lttv-compatibility.html;hb=HEAD
+知道我们需要:
+patch-2.6.32-rc8-lttng-0.180 (这个版本不需要lttng-modules了）
+lttv-0.12.29-02022010 
+ltt-control-0.81-26032010
+2. 首先给linux-2.6打补丁
+需要使用quilt，使用yaourt -S quilt安装.
+进入linux-2.6,解压下载的patch-2.6.32-rc8-lttng-0.180,并重命名为patches目录
+执行如下命令将所有补丁打入
+$ quilt push -a
+需要打开lttng相关feature
+$ ARCH=arm CROSS_COMPILE=arm-linux- make menuconfig
+选中
+General setup -&gt; Activate markers [*]
+              -&gt; Linux Trace Toolkit Next Generation (LTTng) [*]
+$ ARCH=arm CROSS_COMPILE=arm-linux- make -j4 uImage
+$ ARCH=arm CROSS_COMPILE=arm-linux- make -j4 modules
+复制uImage到qemu/mini2440,复制*.ko到root_qtopia/lib里
+
+3. 修改root_qtopia/etc/init.d/rcS加载lttng模块
+insmod /lib/ltt-filter.ko
+insmod /lib/ltt-statedump.ko
+insmod /lib/ltt-kprobes.ko
+insmod /lib/ltt-userspace-event.ko
+
+insmod /lib/block-trace.ko
+insmod /lib/fs-trace.ko
+insmod /lib/ipc-trace.ko
+insmod /lib/kernel-trace.ko
+insmod /lib/lockdep-trace.ko
+insmod /lib/mm-trace.ko
+insmod /lib/net-extended-trace.ko
+insmod /lib/net-trace.ko
+insmod /lib/pm-trace.ko
+insmod /lib/rcu-trace.ko
+insmod /lib/syscall-trace.ko
+insmod /lib/trap-trace.ko
+
+4. 交叉编译lttctl
+解压缩并进入ltt-control
+$ ./configure --host=arm-linux --prefix=/home/user/nfs/root_qtopia
+$ make &amp;&amp; make install
+这是会将编译生成文件直接加入到root_qtopia里使用
+为了使用lttctl需要添加环境变量LTT_DAEMON,通过修改root_qtopia/etc/profile实现
+LTT_DAEMON="/bin/lttd"
+export LTT_DAEMON
+
+5. 编译lttv用来在host上分析生成的trace log
+解压缩进入lttv
+$ ./configure 
+$ make &amp;&amp; make install
+可能链接会出错，需要修改lttv/lttv/Makefile
+需要在每个-lglib-2.0后面添加-lm -lgmodule-2.0,显式使用这些库
+
+6. 启动qemu，并使用lttng
+仿真环境进入shell后，对于arm需要先执行ltt-armall,
+然后执行lttctl -C -w /tmp/trace1 trace1打开一个session开始跟踪，
+想要结束跟踪时可使用lttctl -D trace1
+然后将/tmp/trace1目录复制到/root/下
+
+7. 在Host机上使用lttv-gui分析
+File -&gt; Add Trace来选中放置log的目录root_qtopia/root/trace1,
+
+</screen>
+</sect1>
+<sect1>
+    <title></title>
+    <para>
+    </para>
+</sect1>
+<sect1>
+    <title></title>
+    <para>
+    </para>
+</sect1>
+<sect1>
+    <title></title>
+    <para>
+    </para>
+</sect1>
+<sect1>
+    <title></title>
+    <para>
+    </para>
+</sect1>
+<sect1>
+    <title></title>
+    <para>
+    </para>
+</sect1>
+<sect1>
+    <title></title>
+    <para>
+    </para>
+</sect1>
+<sect1>
+    <title></title>
+    <para>
+    </para>
+</sect1>
+<sect1>
+    <title></title>
+    <para>
+    </para>
+</sect1>
+<sect1>
+    <title></title>
+    <para>
+    </para>
+</sect1>

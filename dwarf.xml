@@ -133,7 +133,7 @@ Contents of the .debug_loc section:
     00000000 10000450 100004b4 (DW_OP_breg31: 48)
     00000000 100004b4 100004b8 (DW_OP_breg11: 0)
     00000000 100004b8 100004bc (DW_OP_breg1: 0)
-    00000000 <End of list>
+    00000000 &lt;End of list&gt;
 表示
 
 </screen>
