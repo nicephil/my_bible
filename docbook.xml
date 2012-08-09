@@ -25,6 +25,109 @@ PUBLIC "-//OASIS//DTD DocBook XML V4.5/zh_cn" "http://www.oasis-open.org/docbook
     <preface>
         感谢默默支持我的家人和朋友
     </preface>
+    <chapter>
+        <title>DOCBOOK的使用</title>
+        <sect1>
+            <title>安装</title>
+            <screen>
+在 Linux 系统中，DocBook 环境主要由以下几个软件包提供libxml2    XML 解析器
+docbook-xml DocBook 的 DTD 定义
+libxslt XSL 转换程序 
+docbook-xsl 用来处理 DocBook-XML 的样式表
+yaourt -S docbook-xml docbook-xsl libxslt libxml2     
+            </screen>
+        </sect1>
+        <sect1>
+            <title>元素</title>
+<screen>
+以下是常用的结构元素元素	说明
+set	集
+book	书
+part	部
+chapter	章
+article	文章
+sections	节
+
+元素    说明     
+sect1   节   
+section 节   
+para    段落     
+formalpara  带标题段落   
+
+    sect1-5逐级嵌套
+
+    可无限嵌套
+
+    简单段落
+
+    复杂段落，可以带标题
+
+
+section其实属于结构元素，它的标题会被收录到目录中。把它们放在这里，因为它们是放进单独文件的最佳元素
+
+类别    元素    说明
+列表    calloutlist  
+bibliolist  书目列表
+glosslist   词汇列表
+itemizedlist    无序列表
+orderedlist 有序列表
+segmentedlist   成分列表
+simplelist  简单列表
+variablelist    定义列表
+告示    caution 小心
+important   重要
+note    注意
+tip 提示
+warning 警告
+文本    address 地址
+literallayout   纯文本
+programlisting  代码
+screen  文本抓屏
+synopsis    命令、函数纲要
+例子，图片和表格    example  
+informalexample  
+figure   
+informalfigure   
+table    
+informaltable    
+媒体文件    audioobject 音频对象
+imageobject 图片对象
+imageobjectco   带 callout 的图片对象
+videoobject 视频对象
+textobject  文本对象
+其他    blockquote  引用
+epigraph    题记
+msgset  有关的错误信息
+sidebar 侧边栏
+
+元素名	含义	示例
+abbrev	略写，一般后面带有一个点('.')	abbrev
+emphasis	强调	强调
+phrase	短语	短语
+quote	用引号引起来	“用引号引起来”
+trademark	注册商标	注册商标™
+literal	文字的字面含义	文字的字面含义
+prompt	提示符	提示符
+userinput	用户输入	用户输入
+subscript	下标	下标
+superscript	上标	上标
+application	软件名	软件名
+command	命令	命令
+envar	环境变量	环境变量
+filename	文件名	文件名
+database	数据库	数据库
+email	电子邮件	&lt;电子邮件&gt;
+
+字符    写法    缩写涵义
+&lt;   &amp;lt;    less than
+&gt;   &amp;gt;    greater than
+&amp;   &amp;amp;   ampersand
+&quot;   &amp;quot;  quote
+&apos;   &amp;apos;  apostrophe
+空格    &amp;nbsp;  none-break space
+</screen>
+        </sect1>
+    </chapter>
 
     <chapter>  
         <title>SWF文件格式概述</title>
