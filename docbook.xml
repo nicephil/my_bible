@@ -14,6 +14,7 @@ PUBLIC "-//OASIS//DTD DocBook XML V4.5/zh_cn" "http://www.oasis-open.org/docbook
 <!ENTITY dwarf SYSTEM "dwarf.xml">
 <!ENTITY qemu SYSTEM "qemu.xml">
 <!ENTITY lockless SYSTEM "lockless_ringbuffer.xml">
+<!ENTITY valgrind SYSTEM "valgrind.xml">
 ]>
 <book>
     <info>
@@ -191,7 +192,8 @@ email	电子邮件	&lt;电子邮件&gt;
     </chapter>
 
     <chapter>  
-        <title>History</title>
+        <title>valgrind</title>
+        &valgrind;
     </chapter>
 
     <chapter>  

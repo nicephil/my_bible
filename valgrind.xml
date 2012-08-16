@@ -1,0 +1,65 @@
+<screen>
+    1. Download and install CodeSourcery cross-compiler (for example this one). Also add folder with CodeSourcery to your linux PATH:export PATH=$PATH:&lt;CodeSourcery_folder&gt; 
+
+
+2. Download and unpack Valgrind 3.6.0;
+
+wget http://valgrind.org/downloads/valgrind-3.6.0.tar.bz2
+tar -xjf ./valgrind-3.6.0.tar.bz2
+cd ./valgrind-3.6.0 
+
+3. Configure Valgrind (replace &lt;path_to_CodeSourcery&gt; with path to your CodeSourcery):
+
+CC=arm-none-linux-gnueabi-gcc CFLAGS=”-pipe -Os -mtune=cortex-a8 -march=armv7-a -mabi=aapcs-linux -msoft-float -I&lt;path_to_CodeSourcery&gt;/arm-none-linux-gnueabi/libc/usr/include” LDFLAGS=”-L&lt;path_to_CodeSourcery&gt;/arm-none-linux-gnueabi/libc/usr/lib” ./configure –prefix=/opt/valgrind –host=armv7-none-linux-gnueabi –target=arm-none-linux-gnueabi –build=i386-ubuntu-linux 
+
+Please pay attention to the “–prefix=/opt/valgrind” parameter. This is directory where Valgrind will be installed (copied) after “make install” command. This parameter is hard-coded to the Valgrind binaries and you have to copy all Valgrind files from ”/opt/valgrind” on your Ubuntu host to the “/opt/valgrind” folder on your Beagleboard exactly with the same folders/files structure. If Valgrind installed not properly (not to the same place as in “–prefix=” parameter) you’ll see error like that:
+
+# valgrind –version 
+valgrind: failed to start tool ‘memcheck’ for platform ‘arm-linux’: No such file or directory
+
+4. Build Valgrind:
+
+make
+
+5. Install Valgrind:
+
+make install
+
+6. Remove unnecessary includes and manual pages:
+
+rm -f -r  /opt/valgrind/include
+rm -f -r  /opt/valgrind/share
+
+7. Copy or move next folders from your host to the Beagleboard-xM (you don’t need these binaries on your host any more):
+
+(HOST)                 (BEAGLEBOARD)
+/opt/valgrind/bin/* -&gt; /opt/valgrind/bin/*
+/opt/valgrind/lib/* -&gt; /opt/valgrind/lib/* 
+
+8. Add Valgrind installation folder to the PATH on your Beagleboard-xM:
+
+PATH=$PATH:/opt/valgrind/bin
+
+9. Make sure everything works.
+
+(!) Please note that you have to use non-stripped standard C/C++ libraries on your Beagleboard-xM or you’ll see errors like that:
+
+# valgrind –leak-check=yes ./test
+==125== Memcheck, a memory error detector
+==125== Copyright (C) 2002-2010, and GNU GPL’d, by Julian Seward et al.
+==125== Using Valgrind-3.6.0 and LibVEX; rerun with -h for copyright info
+==125== Command: /home/default/test/test
+==125== 
+
+valgrind: Fatal error at startup: a function redirection
+valgrind: which is mandatory for this platform-tool combination
+valgrind: cannot be set up. Details of the redirection are:
+valgrind: 
+valgrind: A must-be-redirected function
+valgrind: whose name matches the pattern: memcpy
+valgrind: in an object with soname matching: ld-linux.so.3
+valgrind: was not found whilst processing
+valgrind: symbols from the object with soname: ld-linux.so.3ns for this platform.
+valgrind: 
+valgrind: Cannot continue — exiting now. Sorry.
+</screen>
