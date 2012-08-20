@@ -1,0 +1,100 @@
+<screen>
+ARM指令集:
+ADC 带进位的23位数加法
+ADD
+AND 
+B 32M空间内相对跳转
+BIC 32位数的逻辑位清零 Rd=Rn &emp; ~N
+BKPT 断点指令
+BL
+BLX 带链接的切换跳转 pc=label, T=1, pc=Rm &emp; 0xfffffffe, T=Rm &emp;1
+BX 切换跳转
+CDP CDP2 协处理器数据处理操作
+CLZ 零计数
+CMN 比较两个数的相反数
+CMP
+EOR 32位逻辑异或
+LDC LDC2 从协处理器取一个或多个32位值
+LDM 从内存送多个32位字到ARM寄存器
+LDR 从虚拟地址取一个单个的32位值
+MCR MCR2 MCRR 从寄存器送数据到协处理器
+MLA 32位乘累加  Rd=(Rm*Rs)+Rn MLA Rn, Rm, Rs, Rn
+MOV 传送一个32位数到寄存器
+MRC MRC2 MRRC 从协处理器传送数据到寄存器
+MRS 把状态寄存器的值送到寄存器
+MSR 把通用寄存器值送到状态寄存器
+MUL
+MVN 把一个32位数的逻辑“非”送到寄存器
+QRR 32位逻辑或
+PLD 预装载提示指令
+QADD 有符号32位饱和加
+QDADD 有符号双32位饱和加
+QSUB 有符号32位饱和减
+RSB 逆向32位减法 Rd=N-Rn
+RSC 带进位的逆向32位减法
+SBC Rd=Rn-N-!(carry flag)
+SMLAxy 有符号乘累加（（16位x16位）+32位=32位）
+SMLAL 64位有符号乘累加((32位x32位）+64位=64位）
+SMLALxy
+SMLAWy
+SMULL
+SMULxy
+SMULWy
+STC STC2 从协处理器中把一个或多个32位值存到内存
+STM 把多个32位的寄存器值存到内存
+STR 把寄存器的值存到内存的虚拟地址空间
+SUB
+SWI 软中断
+SWP 把一个字或者一个字节和一个寄存器的值交换
+TEQ 等值测试
+TST 位测试
+UMLAL
+UMULL
+ARM指令只能对存放在寄存器中的数据进行处理，对于存储器数据，只能使用load和store指令进行存取。
+
+数据处理指令：
+MOVE指令，算术指令，逻辑指令，比较指令和乘法指令。大多数数据处理指令可以使用桶型移位器对
+其中一个操作数进行预处理。如果数据处理指令前使用S前缀，指令的执行将会更新cpsr中的标志。
+
+&lt;指令&gt;{&lt;cond&gt;}{S} Rd, N
+通常N是一个寄存器Rm或一个使用#前缀的常量。也可以是一个在数据处理指令使用前被桶型移位器预
+处理过的寄存器Rm
+预处理或移位发生在该指令周期内，对于把一个常量送入寄存器，被2的幂乘或除等操作非常有用
+
+桶型移位器：
+逻辑左移LSL x &lt;&lt; y
+逻辑右移LSR (unsigned)x &gt;&gt; y
+算术右移ASR (signed)x &gt;&gt; y  
+循环右移ROR ((unsigned)x &gt;&gt; y)|(x &lt;&lt;(32-y))
+扩展循环右移RRX (c flag &lt;&lt; 32)|((unsigned)x &gt;&gt; 1)
+立即数 #imm
+寄存器 Rm
+立即数逻辑左移 Rm, LSL #shift_imm
+寄存器逻辑左移 Rm, LSL Rs
+寄存器r1首先左移一位，然后加法操作把r1和桶型移位器的结果相加，最终结果放入r0
+ADD r0,r1,r1,LSL #1
+
+把寄存器r2和r3的结果相乘，然后把结果放在r0和r1中，r0放低32位，r1放高32位
+UMULL r0, r1, r2, r3 [r1,r0]=r2*r3
+
+单寄存器load-store指令寻址方式：
+回写前变址，mem[base+offset] LDR r0,[r1, #4]!
+前变址， mem[base+offset] LDR r0,[r1, #4]
+后变址，mem[base] LDR r0,[r1],#4
+
+
+多寄存器传送指令：
+传输从一个指向存储器的基地址寄存器Rn开始，存取数据到多个寄存器。多寄存器传送指令在数据块操作，
+上下文切换，堆栈处理等比单寄存器传送指令有更高执行效率但是会增加中断延迟。
+&lt;LDM|STM&gt;{&lt;cond&gt;}&lt;寻址模式&gt;Rn{!}, &lt;Registers&gt;>{r*}
+
+常量加载：
+ARM增加两条伪指令用于一个32位常量送入寄存器：
+LDR Rd, =constant
+它的具体执行可以是任意可实现该功能的指令，如果要执行的操作不能用其它指令编码，那么LDR就执行
+存储器读。
+ADR Rd, label
+把一个相对地址写入寄存器，它将会使用一个包括PC相对地址的表达式进行编码
+使用MVN指令
+
+</screen>

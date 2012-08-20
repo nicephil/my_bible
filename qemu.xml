@@ -181,9 +181,40 @@ File -&gt; Add Trace来选中放置log的目录root_qtopia/root/trace1,
 </screen>
 </sect1>
 <sect1>
-    <title></title>
-    <para>
-    </para>
+    <title>qemu下远程调试应用程序</title>
+<screen>
+$ ./qemu-0.12.5/arm-softmmu/qemu-system-arm -M versatilepb -m 128M -kernel ./linux-2.6.35/arch/arm/boot/zImage -initrd ./rootfs.img.gz -append "root=/dev/ram rdinit=/sbin/init" -redir tcp:1234::1234
+
+
+这里“redir”选项会将我Ubuntu PC的端口1234上的所有TCP通信重定向到ARM客户机系统的1234端口上。系统将会启动，然后会打开一个root权限的控制台。在bash提示符下，我运行调试服务器： 
+
+1   # gdbserver --multi 10.0.2.15:1234
+
+
+该命令会启动一个服务器并等待1234端口上的GDB连接。在PC上我可以打开调试器：
+
+1   $ ddd --debugger arm-none-linux-gnueabi-gdb
+
+
+也可以单独运行arm-none-linux-gnueabi-gdb命令或者连接到另外一个前端。要调试远端的程序，我需要告诉GDB使用ARM的共享库而不是本地库（那些用于32位x86的）；否则执行的时候调试器会抱怨说库不匹配。
+
+1   set solib-absolute-prefix nonexistantpath
+
+2   set solib-search-path /home/francesco/CodeSourcery/Sourcery_G++_Lite/arm-none-linux-gnueabi/libc/lib/
+
+3   file ./hello-2.6/src/hello
+
+4   target extended-remote localhost:1234
+
+5   set remote exec-file /usr/bin/hello
+
+6   break main
+
+7   run
+
+
+到这里后，调试过程就跟平常一样了。
+</screen>
 </sect1>
 <sect1>
     <title></title>
